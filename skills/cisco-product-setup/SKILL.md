@@ -140,6 +140,15 @@ output lists for the resolved product.
 
 ## Product Coverage
 
+For package identity, publisher/support distinctions, and dated adoption holds,
+consult the [Cisco Splunkbase audit](../../docs/cisco-splunkbase-audit-2026-11-16/README.md).
+The product router selects a collection use case; it does not approve every
+Splunkbase package for that product. In particular, Cyber Vision 5748/5747,
+CESA 4221/2992, and Splunk's ISE TA 1915 are separate package contracts from
+the Cisco Enterprise Networking and Security Cloud routes. Preserve their
+support, license, collector, and migration boundaries in a package-specific
+handoff; do not substitute an existing route's configuration fields.
+
 - Automated products use the existing Cisco family skills already in this repo.
 - Partial products list the backed collector or handoff workflow and succeed
   in `--dry-run` previews, but do not perform live configuration through this

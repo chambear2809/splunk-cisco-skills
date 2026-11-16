@@ -80,8 +80,8 @@ def test_latest_release_gaps_use_verified_10_5_pins() -> None:
         assert app["latest_verified_version"] in app["notes"], skill
         assert app["latest_release_version"] in app["notes"], skill
 
-    # The verified packages advertise 10.5. Keep both skills conditional until the
-    # newer public package release is downloaded and reviewed for the Cloud target.
+    # The selected packages advertise 10.5. Cloud workflow guards remain
+    # conditional; a newer default or parallel release does not approve adoption.
     for skill in release_specific:
         app = by_skill[skill]
         assert "10.5" in app["verified_platform_versions"], skill
@@ -113,7 +113,7 @@ def test_review_blocked_mcp_package_is_explicitly_classified() -> None:
             "name": "Splunk_MCP_Server",
             "relationship": "primary",
             "status": "supported",
-            "release_version": "2.0.0",
+            "release_version": "2.1.0",
             "verified_version": "1.3.1",
             "verified_status": "supported",
             "cloud_compatible": True,

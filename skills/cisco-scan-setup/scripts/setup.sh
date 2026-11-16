@@ -181,7 +181,8 @@ main() {
     fi
 
     log ""
-    log "Setup complete. Run 'bash ${SCRIPT_DIR}/validate.sh' to verify the deployment."
+    bash "${SCRIPT_DIR}/validate.sh" --completion
+    log "Catalog prerequisites passed. Open the shipped views and retain dashboard results before handoff."
 }
 
 main

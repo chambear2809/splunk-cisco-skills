@@ -92,6 +92,14 @@ skill then creates the `cisco_ucs` index, configures default class-ID
 templates, creates UCS Manager server records, and enables `cisco_ucs_task`
 inputs.
 
+The shared installer defaults to the repository-inspected `5.0.0` package.
+[Splunkbase](https://splunkbase.splunk.com/app/2731) listed `5.0.0` as its
+default on November 16, 2026, with Splunk 10.5 and Cloud compatibility.
+The package was downloaded and inspected: `cisco_ucs_task` is shipped disabled
+with a 300-second default; `configure_task.sh` explicitly serializes
+`disabled=0` when an operator enables a task. Migration utilities cover existing inputs/passwords/templates,
+and the package ships Monitoring Dashboard, Inputs, and Configuration views.
+
 ## Credentials
 
 Never ask for UCS passwords in chat. Ask the user to create a local secret file:

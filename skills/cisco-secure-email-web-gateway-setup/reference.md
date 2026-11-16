@@ -1,6 +1,6 @@
 # Cisco ESA/WSA Package Reference
 
-Sources: Splunk Add-on for Cisco ESA `1.7.1`, Splunk Add-on for Cisco WSA
+Sources: Splunk Add-on for Cisco ESA `1.8.0` (inspected 2026-11-16), Splunk Add-on for Cisco WSA
 `5.0.0`, and SC4S Cisco ESA/WSA source documentation.
 
 ## Apps

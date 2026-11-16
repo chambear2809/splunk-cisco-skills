@@ -6,8 +6,8 @@ compatibility: >-
   entitlement, topology, and customer-managed runtime guardrails; self-managed
   paths use the separate Enterprise 10.6 compatibility contract.
 metadata:
-  splunk_enterprise_10_6: "conditional"
-  enterprise_compatibility_verified: "2026-10-05"
+  splunk_enterprise_10_6: "supported"
+  enterprise_compatibility_verified: "2026-11-16"
   splunk_cloud_10_5: "conditional"
   compatibility_verified: "2026-08-20"
 ---
@@ -94,6 +94,8 @@ Use the setup script with `--install` to install add-on ID `7569` and app ID
 `5558`. The shared installer falls back to local packages
 `cisco-secure-access-add-on-for-splunk_*` and
 `cisco-secure-access-app-for-splunk_*` when needed.
+
+Splunkbase listed `1.0.57` as the add-on default on November 16, 2026 ([listing](https://splunkbase.splunk.com/app/7569)). Verify the installed package contract before relying on version-specific setup details.
 
 The app hosts dashboards and account/settings endpoints. The add-on is required
 for Secure Access, Umbrella, and Cloudlock event-log ingestion and index

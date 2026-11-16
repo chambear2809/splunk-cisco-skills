@@ -97,7 +97,8 @@ ESA/WSA syslog export, SC4S, or file-monitor deployment.
 
 ## Package Verification Boundary
 
-The ESA package-derived behavior was verified against `1.7.1`, the current
+The ESA package-derived behavior was re-verified against `1.8.0` on 2026-11-16
+(archive SHA-256 `486010da6765b8eb63b616912b38a0186c80c95ef7dc3f74e19592346bdb1a5a`), the current
 public listing, which advertises Splunk 10.5. That package was downloaded,
 unpacked, and inspected here, so the shared installer's default pin needs no
 review override and no historical-pin acknowledgement. The WSA package carries

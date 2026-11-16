@@ -91,6 +91,8 @@ Use `splunk-app-install` with `--source splunkbase --app-id 5580` to get the
 latest release. If Splunkbase is unavailable, fall back to the local package
 in `splunk-ta/`. This applies to both Splunk Cloud (ACS) and Splunk Enterprise.
 
+Splunkbase listed `3.5.0` as its default on November 16, 2026 ([listing](https://splunkbase.splunk.com/app/5580)). The exact archive was downloaded and inspected on that date (45 shipped views; organization-security interval 360 seconds), so the current input contract is reviewed. Continue the completion gate for live ingest and dashboard searches.
+
 After installation, use this skill to configure the account, inputs, dashboard
 macro, and validation over search-tier REST. Any `splunk-ta/_unpacked/` tree
 is review-only.

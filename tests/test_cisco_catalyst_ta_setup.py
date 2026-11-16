@@ -155,10 +155,10 @@ def test_docs_record_current_ta_source_contract_without_overstating_package_evid
     skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
     reference = (SKILL_ROOT / "reference.md").read_text(encoding="utf-8")
 
-    # The source contract and the package evidence now agree on 3.2.44, which is
-    # also the current public release. The docs must say so explicitly rather
-    # than leave a stale evidence-behind-contract claim in place.
-    assert "now the same release, `3.2.44`" in skill
+    # Keep the reviewed pair distinct from the newer inspected listing default.
+    assert "both `3.2.44`" in skill
+    assert "`4.0.60`" in skill
+    assert "downloaded and inspected" in skill
     assert "29 modular input types" in reference
 
     # Closing that gap must not turn into overstated evidence: the one surviving

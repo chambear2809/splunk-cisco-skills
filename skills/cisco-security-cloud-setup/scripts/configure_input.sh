@@ -242,6 +242,21 @@ if ! rest_check_app "$SK" "$SPLUNK_URI" "$APP_NAME" 2>/dev/null; then
     exit 1
 fi
 
+# Direct configure_product/configure_input entry points must enforce the same
+# reviewed package contract as setup.sh before creating indexes or mutating an
+# input. The public 4.x line is intentionally held until its FTD migration is
+# approved. A vendor-approved override is explicit and remains unsupported.
+verified_app_version="3.6.10"
+installed_app_version="$(rest_get_app_version "$SK" "$SPLUNK_URI" "$APP_NAME" 2>/dev/null || true)"
+if [[ "${installed_app_version}" != "${verified_app_version}" ]]; then
+    if [[ "${SPLUNK_ACCEPT_UNSUPPORTED_PLATFORM:-false}" != "true" ]]; then
+        log "ERROR: Installed ${APP_NAME} ${installed_app_version:-unknown} is not the repo-reviewed package contract (${verified_app_version}); refusing configuration before REST mutation."
+        log "Pass SPLUNK_ACCEPT_UNSUPPORTED_PLATFORM=true only with documented vendor approval for this exact package and stack."
+        exit 1
+    fi
+    log "WARNING: Explicit vendor-approved override accepted for ${APP_NAME} ${installed_app_version:-unknown}."
+fi
+
 index_name="$(get_param index || true)"
 if [[ -n "${index_name}" && "${CREATE_INDEX}" == "true" ]]; then
     if platform_create_index "${SK}" "${SPLUNK_URI}" "${index_name}" "512000"; then

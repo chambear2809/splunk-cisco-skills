@@ -1,0 +1,4573 @@
+{
+  "splunkbase_app_count": 120,
+  "configuration_findings": [],
+  "offline_findings": [],
+  "evidence_findings": [],
+  "live_findings": [
+    {
+      "actual": "October 1, 2026",
+      "app_name": "SplunkEnterpriseSecuritySuite",
+      "expected": "November 4, 2026",
+      "field": "latest_release_date",
+      "id": "263",
+      "severity": "error"
+    },
+    {
+      "actual": "8.7.1",
+      "app_name": "SplunkEnterpriseSecuritySuite",
+      "expected": "8.8.0",
+      "field": "latest_release_version",
+      "id": "263",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2"
+      ],
+      "app_name": "SplunkEnterpriseSecuritySuite",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2"
+      ],
+      "field": "platform_versions",
+      "id": "263",
+      "severity": "error"
+    },
+    {
+      "actual": "October 1, 2026",
+      "app_name": "Splunk_TA_windows",
+      "expected": "October 27, 2026",
+      "field": "latest_release_date",
+      "id": "742",
+      "severity": "error"
+    },
+    {
+      "actual": "11.0.3",
+      "app_name": "Splunk_TA_windows",
+      "expected": "12.0.0",
+      "field": "latest_release_version",
+      "id": "742",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "app_name": "Splunk_TA_windows",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "field": "platform_versions",
+      "id": "742",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "app_name": "Splunk_TA_windows",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "field": "verified_platform_versions",
+      "id": "742",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4"
+      ],
+      "app_name": "Splunk_TA_nix",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4"
+      ],
+      "field": "platform_versions",
+      "id": "833",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4"
+      ],
+      "app_name": "Splunk_TA_nix",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4"
+      ],
+      "field": "verified_platform_versions",
+      "id": "833",
+      "severity": "error"
+    },
+    {
+      "actual": "October 1, 2026",
+      "app_name": "SplunkPCIComplianceSuite",
+      "expected": "November 4, 2026",
+      "field": "latest_release_date",
+      "id": "1143",
+      "severity": "error"
+    },
+    {
+      "actual": "8.7.1",
+      "app_name": "SplunkPCIComplianceSuite",
+      "expected": "8.8.0",
+      "field": "latest_release_version",
+      "id": "1143",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2"
+      ],
+      "app_name": "SplunkPCIComplianceSuite",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2"
+      ],
+      "field": "platform_versions",
+      "id": "1143",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0"
+      ],
+      "app_name": "SplunkPCIComplianceSuite",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0"
+      ],
+      "field": "verified_platform_versions",
+      "id": "1143",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "app_name": "Splunk_TA_cisco-asa",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "field": "platform_versions",
+      "id": "1620",
+      "severity": "error"
+    },
+    {
+      "actual": "September 2, 2026",
+      "app_name": "Splunk_SA_CIM",
+      "expected": "October 21, 2026",
+      "field": "latest_release_date",
+      "id": "1621",
+      "severity": "error"
+    },
+    {
+      "actual": "8.7.0",
+      "app_name": "Splunk_SA_CIM",
+      "expected": "8.8.0",
+      "field": "latest_release_version",
+      "id": "1621",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4"
+      ],
+      "app_name": "Splunk_SA_CIM",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4"
+      ],
+      "field": "platform_versions",
+      "id": "1621",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "app_name": "Splunk_SA_CIM",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "field": "verified_platform_versions",
+      "id": "1621",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2"
+      ],
+      "app_name": "lookup_editor",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2"
+      ],
+      "field": "platform_versions",
+      "id": "1724",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1"
+      ],
+      "app_name": "Splunk_TA_cisco-wsa",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1"
+      ],
+      "field": "platform_versions",
+      "id": "1747",
+      "severity": "error"
+    },
+    {
+      "actual": "June 30, 2026",
+      "app_name": "Splunk_TA_cisco-esa",
+      "expected": "October 12, 2026",
+      "field": "latest_release_date",
+      "id": "1761",
+      "severity": "error"
+    },
+    {
+      "actual": "1.7.1",
+      "app_name": "Splunk_TA_cisco-esa",
+      "expected": "1.8.0",
+      "field": "latest_release_version",
+      "id": "1761",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1"
+      ],
+      "app_name": "Splunk_TA_cisco-esa",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1"
+      ],
+      "field": "platform_versions",
+      "id": "1761",
+      "severity": "error"
+    },
+    {
+      "actual": "March 3, 2026",
+      "app_name": "splunk_app_stream",
+      "expected": "October 12, 2026",
+      "field": "latest_release_date",
+      "id": "1809",
+      "severity": "error"
+    },
+    {
+      "actual": "8.1.6",
+      "app_name": "splunk_app_stream",
+      "expected": "8.1.7",
+      "field": "latest_release_version",
+      "id": "1809",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "app_name": "splunk_app_stream",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4"
+      ],
+      "field": "platform_versions",
+      "id": "1809",
+      "severity": "error"
+    },
+    {
+      "actual": "September 17, 2026",
+      "app_name": "SA-ITOA",
+      "expected": "October 28, 2026",
+      "field": "latest_release_date",
+      "id": "1841",
+      "severity": "error"
+    },
+    {
+      "actual": "5.0.2",
+      "app_name": "SA-ITOA",
+      "expected": "5.0.3",
+      "field": "latest_release_version",
+      "id": "1841",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2"
+      ],
+      "app_name": "SA-ITOA",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2"
+      ],
+      "field": "platform_versions",
+      "id": "1841",
+      "severity": "error"
+    },
+    {
+      "actual": "August 19, 2026",
+      "app_name": "Splunk_TA_aws",
+      "expected": "October 21, 2026",
+      "field": "latest_release_date",
+      "id": "1876",
+      "severity": "error"
+    },
+    {
+      "actual": "8.2.2",
+      "app_name": "Splunk_TA_aws",
+      "expected": "8.3.1",
+      "field": "latest_release_version",
+      "id": "1876",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "app_name": "Splunk_TA_aws",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "field": "platform_versions",
+      "id": "1876",
+      "severity": "error"
+    },
+    {
+      "actual": "August 27, 2025",
+      "app_name": "Splunk_TA_oracle",
+      "expected": "October 22, 2026",
+      "field": "latest_release_date",
+      "id": "1910",
+      "severity": "error"
+    },
+    {
+      "actual": "4.2.0",
+      "app_name": "Splunk_TA_oracle",
+      "expected": "5.0.0",
+      "field": "latest_release_version",
+      "id": "1910",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1"
+      ],
+      "app_name": "Splunk_TA_oracle",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "field": "platform_versions",
+      "id": "1910",
+      "severity": "error"
+    },
+    {
+      "actual": "September 21, 2026",
+      "app_name": "Splunk_TA_snow",
+      "expected": "October 30, 2026",
+      "field": "latest_release_date",
+      "id": "1928",
+      "severity": "error"
+    },
+    {
+      "actual": "11.2.0",
+      "app_name": "Splunk_TA_snow",
+      "expected": "11.2.1",
+      "field": "latest_release_version",
+      "id": "1928",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "app_name": "Splunk_TA_snow",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "field": "platform_versions",
+      "id": "1928",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "app_name": "Splunk_TA_snow",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "field": "verified_platform_versions",
+      "id": "1928",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "app_name": "Splunk_TA_box",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "field": "platform_versions",
+      "id": "2679",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "app_name": "Splunk_TA_f5-bigip",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "field": "platform_versions",
+      "id": "2680",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "app_name": "splunk_app_db_connect",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "field": "platform_versions",
+      "id": "2686",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "app_name": "Splunk_TA_microsoft-scom",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "field": "platform_versions",
+      "id": "2729",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "app_name": "Splunk_TA_microsoft-scom",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "field": "verified_platform_versions",
+      "id": "2729",
+      "severity": "error"
+    },
+    {
+      "actual": "September 10, 2026",
+      "app_name": "Splunk_TA_cisco-ucs",
+      "expected": "October 21, 2026",
+      "field": "latest_release_date",
+      "id": "2731",
+      "severity": "error"
+    },
+    {
+      "actual": "4.3.3",
+      "app_name": "Splunk_TA_cisco-ucs",
+      "expected": "5.0.0",
+      "field": "latest_release_version",
+      "id": "2731",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1"
+      ],
+      "app_name": "Splunk_TA_cisco-ucs",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1"
+      ],
+      "field": "platform_versions",
+      "id": "2731",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2"
+      ],
+      "app_name": "Splunk_TA_bluecoat-proxysg",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2"
+      ],
+      "field": "platform_versions",
+      "id": "2758",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "app_name": "Splunk_TA_citrix-netscaler",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "field": "platform_versions",
+      "id": "2770",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "app_name": "Splunk_TA_symantec-ep",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "field": "platform_versions",
+      "id": "2772",
+      "severity": "error"
+    },
+    {
+      "actual": "August 27, 2025",
+      "app_name": "Splunk_TA_bit9-carbonblack",
+      "expected": "October 19, 2026",
+      "field": "latest_release_date",
+      "id": "2790",
+      "severity": "error"
+    },
+    {
+      "actual": "3.0.0",
+      "app_name": "Splunk_TA_bit9-carbonblack",
+      "expected": "3.0.1",
+      "field": "latest_release_version",
+      "id": "2790",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2"
+      ],
+      "app_name": "Splunk_TA_bit9-carbonblack",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "field": "platform_versions",
+      "id": "2790",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1"
+      ],
+      "app_name": "Splunk_TA_mysql",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1"
+      ],
+      "field": "platform_versions",
+      "id": "2848",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "app_name": "Splunk_SA_Scientific_Python_darwin_x86_64",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "field": "platform_versions",
+      "id": "2881",
+      "severity": "error"
+    },
+    {
+      "actual": "July 22, 2026",
+      "app_name": "Splunk_SA_Scientific_Python_linux_x86_64",
+      "expected": "October 13, 2026",
+      "field": "latest_release_date",
+      "id": "2882",
+      "severity": "error"
+    },
+    {
+      "actual": "4.3.4",
+      "app_name": "Splunk_SA_Scientific_Python_linux_x86_64",
+      "expected": "4.3.5",
+      "field": "latest_release_version",
+      "id": "2882",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "app_name": "Splunk_SA_Scientific_Python_linux_x86_64",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "field": "platform_versions",
+      "id": "2882",
+      "severity": "error"
+    },
+    {
+      "actual": "July 22, 2026",
+      "app_name": "Splunk_SA_Scientific_Python_windows_x86_64",
+      "expected": "October 13, 2026",
+      "field": "latest_release_date",
+      "id": "2883",
+      "severity": "error"
+    },
+    {
+      "actual": "4.3.4",
+      "app_name": "Splunk_SA_Scientific_Python_windows_x86_64",
+      "expected": "4.3.5",
+      "field": "latest_release_version",
+      "id": "2883",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "app_name": "Splunk_SA_Scientific_Python_windows_x86_64",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "field": "platform_versions",
+      "id": "2883",
+      "severity": "error"
+    },
+    {
+      "actual": "August 25, 2026",
+      "app_name": "Splunk_ML_Toolkit",
+      "expected": "October 14, 2026",
+      "field": "latest_release_date",
+      "id": "2890",
+      "severity": "error"
+    },
+    {
+      "actual": "6.1.0",
+      "app_name": "Splunk_ML_Toolkit",
+      "expected": "6.2.0",
+      "field": "latest_release_version",
+      "id": "2890",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "app_name": "Splunk_ML_Toolkit",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "field": "platform_versions",
+      "id": "2890",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "app_name": "Splunk_ML_Toolkit",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "field": "verified_platform_versions",
+      "id": "2890",
+      "severity": "error"
+    },
+    {
+      "actual": false,
+      "app_name": "Splunk_TA_cyberark",
+      "expected": true,
+      "field": "cloud_compatible",
+      "id": "2891",
+      "severity": "error"
+    },
+    {
+      "actual": "rejected",
+      "app_name": "Splunk_TA_cyberark",
+      "expected": "appmgmt_phase",
+      "field": "install_method_distributed",
+      "id": "2891",
+      "severity": "error"
+    },
+    {
+      "actual": "rejected",
+      "app_name": "Splunk_TA_cyberark",
+      "expected": "simple",
+      "field": "install_method_single",
+      "id": "2891",
+      "severity": "error"
+    },
+    {
+      "actual": "December 2, 2021",
+      "app_name": "Splunk_TA_cyberark",
+      "expected": "October 2, 2026",
+      "field": "latest_release_date",
+      "id": "2891",
+      "severity": "error"
+    },
+    {
+      "actual": "1.2.0",
+      "app_name": "Splunk_TA_cyberark",
+      "expected": "2.0.0",
+      "field": "latest_release_version",
+      "id": "2891",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "app_name": "Splunk_TA_cyberark",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "field": "platform_versions",
+      "id": "2891",
+      "severity": "error"
+    },
+    {
+      "actual": "October 1, 2026",
+      "app_name": "SplunkPCIComplianceSuite_ES",
+      "expected": "November 4, 2026",
+      "field": "latest_release_date",
+      "id": "2897",
+      "severity": "error"
+    },
+    {
+      "actual": "8.7.1",
+      "app_name": "SplunkPCIComplianceSuite_ES",
+      "expected": "8.8.0",
+      "field": "latest_release_version",
+      "id": "2897",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2"
+      ],
+      "app_name": "SplunkPCIComplianceSuite_ES",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2"
+      ],
+      "field": "platform_versions",
+      "id": "2897",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0"
+      ],
+      "app_name": "SplunkPCIComplianceSuite_ES",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0"
+      ],
+      "field": "verified_platform_versions",
+      "id": "2897",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "app_name": "Splunk_TA_tomcat",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "field": "platform_versions",
+      "id": "2911",
+      "severity": "error"
+    },
+    {
+      "actual": false,
+      "app_name": "Splunk_TA_infoblox",
+      "expected": true,
+      "field": "cloud_compatible",
+      "id": "2934",
+      "severity": "error"
+    },
+    {
+      "actual": "rejected",
+      "app_name": "Splunk_TA_infoblox",
+      "expected": "appmgmt_phase",
+      "field": "install_method_distributed",
+      "id": "2934",
+      "severity": "error"
+    },
+    {
+      "actual": "rejected",
+      "app_name": "Splunk_TA_infoblox",
+      "expected": "simple",
+      "field": "install_method_single",
+      "id": "2934",
+      "severity": "error"
+    },
+    {
+      "actual": "October 6, 2022",
+      "app_name": "Splunk_TA_infoblox",
+      "expected": "October 29, 2026",
+      "field": "latest_release_date",
+      "id": "2934",
+      "severity": "error"
+    },
+    {
+      "actual": "2.2.0",
+      "app_name": "Splunk_TA_infoblox",
+      "expected": "2.2.1",
+      "field": "latest_release_version",
+      "id": "2934",
+      "severity": "error"
+    },
+    {
+      "actual": "2.2.0",
+      "app_name": "Splunk_TA_infoblox",
+      "expected": "release present in public release API",
+      "field": "latest_verified_version",
+      "id": "2934",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "app_name": "Splunk_TA_infoblox",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4"
+      ],
+      "field": "platform_versions",
+      "id": "2934",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2"
+      ],
+      "app_name": "Splunk_TA_rsa-securid",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2"
+      ],
+      "field": "platform_versions",
+      "id": "2958",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4"
+      ],
+      "app_name": "Splunk_TA_google-cloudplatform",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4"
+      ],
+      "field": "platform_versions",
+      "id": "3088",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "app_name": "Splunk_TA_google-cloudplatform",
+      "expected": [],
+      "field": "verified_platform_versions",
+      "id": "3088",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "app_name": "Splunk_TA_microsoft-cloudservices",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "field": "platform_versions",
+      "id": "3110",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "app_name": "Splunk_TA_microsoft-cloudservices",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "field": "verified_platform_versions",
+      "id": "3110",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1"
+      ],
+      "app_name": "Splunk_TA_microsoft-iis",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1"
+      ],
+      "field": "platform_versions",
+      "id": "3185",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "app_name": "Splunk_TA_apache",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "field": "platform_versions",
+      "id": "3186",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0"
+      ],
+      "app_name": "TA-Exchange-ClientAccess",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0"
+      ],
+      "field": "platform_versions",
+      "id": "3225",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4"
+      ],
+      "app_name": "Splunk_TA_nginx",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4"
+      ],
+      "field": "platform_versions",
+      "id": "3258",
+      "severity": "error"
+    },
+    {
+      "actual": "September 2, 2026",
+      "app_name": "phantom",
+      "expected": "November 3, 2026",
+      "field": "latest_release_date",
+      "id": "3411",
+      "severity": "error"
+    },
+    {
+      "actual": "8.7.0",
+      "app_name": "phantom",
+      "expected": "8.8.0",
+      "field": "latest_release_version",
+      "id": "3411",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2"
+      ],
+      "app_name": "phantom",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2"
+      ],
+      "field": "platform_versions",
+      "id": "3411",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "app_name": "Splunk_TA_Linux",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "field": "platform_versions",
+      "id": "3412",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2"
+      ],
+      "app_name": "Splunk_TA_ontap",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2"
+      ],
+      "field": "platform_versions",
+      "id": "3418",
+      "severity": "error"
+    },
+    {
+      "actual": "January 21, 2026",
+      "app_name": "Splunk_Security_Essentials",
+      "expected": "October 28, 2026",
+      "field": "latest_release_date",
+      "id": "3435",
+      "severity": "error"
+    },
+    {
+      "actual": "3.8.3",
+      "app_name": "Splunk_Security_Essentials",
+      "expected": "3.8.4",
+      "field": "latest_release_version",
+      "id": "3435",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "app_name": "Splunk_Security_Essentials",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4"
+      ],
+      "field": "platform_versions",
+      "id": "3435",
+      "severity": "error"
+    },
+    {
+      "actual": "September 23, 2026",
+      "app_name": "DA-ESS-ContentUpdate",
+      "expected": "November 4, 2026",
+      "field": "latest_release_date",
+      "id": "3449",
+      "severity": "error"
+    },
+    {
+      "actual": "6.7.0",
+      "app_name": "DA-ESS-ContentUpdate",
+      "expected": "6.10.0",
+      "field": "latest_release_version",
+      "id": "3449",
+      "severity": "error"
+    },
+    {
+      "actual": "6.4.0",
+      "app_name": "DA-ESS-ContentUpdate",
+      "expected": "release present in public release API",
+      "field": "latest_verified_version",
+      "id": "3449",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "app_name": "DA-ESS-ContentUpdate",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "field": "platform_versions",
+      "id": "3449",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "app_name": "DA-ESS-ContentUpdate",
+      "expected": [],
+      "field": "verified_platform_versions",
+      "id": "3449",
+      "severity": "error"
+    },
+    {
+      "actual": "May 1, 2026",
+      "app_name": "Splunk_TA_AppDynamics",
+      "expected": "October 22, 2026",
+      "field": "latest_release_date",
+      "id": "3471",
+      "severity": "error"
+    },
+    {
+      "actual": "3.2.1",
+      "app_name": "Splunk_TA_AppDynamics",
+      "expected": "3.3.0",
+      "field": "latest_release_version",
+      "id": "3471",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "app_name": "Splunk_TA_AppDynamics",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0"
+      ],
+      "field": "platform_versions",
+      "id": "3471",
+      "severity": "error"
+    },
+    {
+      "actual": "July 21, 2026",
+      "app_name": "victorops_app",
+      "expected": "November 16, 2026",
+      "field": "latest_release_date",
+      "id": "3546",
+      "severity": "error"
+    },
+    {
+      "actual": "1.0.43",
+      "app_name": "victorops_app",
+      "expected": "1.0.44",
+      "field": "latest_release_version",
+      "id": "3546",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "app_name": "victorops_app",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "field": "platform_versions",
+      "id": "3546",
+      "severity": "error"
+    },
+    {
+      "actual": "September 3, 2026",
+      "app_name": "Splunk_TA_salesforce",
+      "expected": "October 21, 2026",
+      "field": "latest_release_date",
+      "id": "3549",
+      "severity": "error"
+    },
+    {
+      "actual": "7.0.1",
+      "app_name": "Splunk_TA_salesforce",
+      "expected": "7.0.2",
+      "field": "latest_release_version",
+      "id": "3549",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "app_name": "Splunk_TA_salesforce",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "field": "platform_versions",
+      "id": "3549",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "app_name": "Splunk_TA_salesforce",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "field": "verified_platform_versions",
+      "id": "3549",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "app_name": "splunk_ta_o365",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "field": "platform_versions",
+      "id": "4055",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "app_name": "splunk_ta_o365",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "field": "verified_platform_versions",
+      "id": "4055",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2"
+      ],
+      "app_name": "Splunk-UBA-SA-Kafka",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2"
+      ],
+      "field": "platform_versions",
+      "id": "4147",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "app_name": "infosec_app_for_splunk",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "field": "platform_versions",
+      "id": "4240",
+      "severity": "error"
+    },
+    {
+      "actual": "May 21, 2026",
+      "app_name": "splunk_health_assistant_addon",
+      "expected": "November 2, 2026",
+      "field": "latest_release_date",
+      "id": "4603",
+      "severity": "error"
+    },
+    {
+      "actual": "2026.5.23",
+      "app_name": "splunk_health_assistant_addon",
+      "expected": "2026.11.2",
+      "field": "latest_release_version",
+      "id": "4603",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4"
+      ],
+      "app_name": "splunk_health_assistant_addon",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4"
+      ],
+      "field": "platform_versions",
+      "id": "4603",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "app_name": "mltk-container",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "field": "platform_versions",
+      "id": "4607",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1"
+      ],
+      "app_name": "microsoft_azure_app",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1"
+      ],
+      "field": "platform_versions",
+      "id": "4882",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "app_name": "TA-splunk-add-on-for-victorops",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "field": "platform_versions",
+      "id": "4886",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "app_name": "cisco_webex_meetings_app_for_splunk",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "field": "platform_versions",
+      "id": "4992",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2"
+      ],
+      "app_name": "Splunk_TA_vmware_inframon",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2"
+      ],
+      "field": "platform_versions",
+      "id": "5089",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "app_name": "Splunk_TA_cyberark_epm",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "field": "platform_versions",
+      "id": "5160",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "app_name": "Splunk_TA_cyberark_epm",
+      "expected": [],
+      "field": "verified_platform_versions",
+      "id": "5160",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "app_name": "Splunk_TA_rsa_securid_cas",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "field": "platform_versions",
+      "id": "5210",
+      "severity": "error"
+    },
+    {
+      "actual": "March 3, 2026",
+      "app_name": "Splunk_TA_stream_wire_data",
+      "expected": "October 12, 2026",
+      "field": "latest_release_date",
+      "id": "5234",
+      "severity": "error"
+    },
+    {
+      "actual": "8.1.6",
+      "app_name": "Splunk_TA_stream_wire_data",
+      "expected": "8.1.7",
+      "field": "latest_release_version",
+      "id": "5234",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "app_name": "Splunk_TA_stream_wire_data",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4"
+      ],
+      "field": "platform_versions",
+      "id": "5234",
+      "severity": "error"
+    },
+    {
+      "actual": "March 3, 2026",
+      "app_name": "Splunk_TA_stream",
+      "expected": "October 12, 2026",
+      "field": "latest_release_date",
+      "id": "5238",
+      "severity": "error"
+    },
+    {
+      "actual": "8.1.6",
+      "app_name": "Splunk_TA_stream",
+      "expected": "8.1.7",
+      "field": "latest_release_version",
+      "id": "5238",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "app_name": "Splunk_TA_stream",
+      "expected": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4"
+      ],
+      "field": "platform_versions",
+      "id": "5238",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2"
+      ],
+      "app_name": "Splunk_TA_sim",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2"
+      ],
+      "field": "platform_versions",
+      "id": "5247",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2"
+      ],
+      "app_name": "DA-ITSI-ContentLibrary",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2"
+      ],
+      "field": "platform_versions",
+      "id": "5391",
+      "severity": "error"
+    },
+    {
+      "actual": "August 28, 2026",
+      "app_name": "Splunk_TA_Google_Workspace",
+      "expected": "November 2, 2026",
+      "field": "latest_release_date",
+      "id": "5556",
+      "severity": "error"
+    },
+    {
+      "actual": "5.0.1",
+      "app_name": "Splunk_TA_Google_Workspace",
+      "expected": "5.1.0",
+      "field": "latest_release_version",
+      "id": "5556",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "app_name": "Splunk_TA_Google_Workspace",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "field": "platform_versions",
+      "id": "5556",
+      "severity": "error"
+    },
+    {
+      "actual": "July 13, 2026",
+      "app_name": "cisco-cloud-security",
+      "expected": "October 21, 2026",
+      "field": "latest_release_date",
+      "id": "5558",
+      "severity": "error"
+    },
+    {
+      "actual": "1.0.57",
+      "app_name": "cisco-cloud-security",
+      "expected": "1.0.60",
+      "field": "latest_release_version",
+      "id": "5558",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2"
+      ],
+      "app_name": "Splunk_TA_cisco_meraki",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2"
+      ],
+      "field": "platform_versions",
+      "id": "5580",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2"
+      ],
+      "app_name": "Splunk_TA_cisco_meraki",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2"
+      ],
+      "field": "verified_platform_versions",
+      "id": "5580",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "app_name": "TA-ONTAP-FieldExtractions",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "field": "platform_versions",
+      "id": "5615",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "app_name": "SA-ONTAPIndex",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "field": "platform_versions",
+      "id": "5616",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "app_name": "SA-ExchangeIndex",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "field": "platform_versions",
+      "id": "5663",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2"
+      ],
+      "app_name": "Splunk_TA_microsoft_sysmon",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2"
+      ],
+      "field": "platform_versions",
+      "id": "5709",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "8.7",
+        "8.6",
+        "8.5",
+        "8.4",
+        "8.0",
+        "7.2",
+        "7.1",
+        "7.0",
+        "6.4",
+        "6.3",
+        "6.2",
+        "6.1",
+        "6.0",
+        "5.5",
+        "5.4",
+        "5.3",
+        "5.2",
+        "5.1"
+      ],
+      "app_name": "splunkoncall",
+      "expected": [
+        "8.8",
+        "8.7",
+        "8.6",
+        "8.5",
+        "8.4",
+        "8.0",
+        "7.2",
+        "7.1",
+        "7.0",
+        "6.4",
+        "6.3",
+        "6.2",
+        "6.1",
+        "6.0",
+        "5.5",
+        "5.4",
+        "5.3",
+        "5.2",
+        "5.1"
+      ],
+      "field": "platform_versions",
+      "id": "5863",
+      "severity": "error"
+    },
+    {
+      "actual": "September 3, 2025",
+      "app_name": "Amazon Redshift JDBC Driver Add-on for Splunk DB Connect",
+      "expected": "September 16, 2026",
+      "field": "latest_release_date",
+      "id": "6149",
+      "severity": "error"
+    },
+    {
+      "actual": "1.2.2",
+      "app_name": "Amazon Redshift JDBC Driver Add-on for Splunk DB Connect",
+      "expected": "1.2.3",
+      "field": "latest_release_version",
+      "id": "6149",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "app_name": "Amazon Redshift JDBC Driver Add-on for Splunk DB Connect",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "field": "platform_versions",
+      "id": "6149",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "app_name": "Microsoft SQL Server JDBC Driver Add-on for Splunk DB Connect",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "field": "platform_versions",
+      "id": "6150",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "app_name": "Oracle JDBC Driver Add-on for Splunk DB Connect",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "field": "platform_versions",
+      "id": "6151",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "app_name": "PostgreSQL JDBC Driver Add-on for Splunk DB Connect",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "field": "platform_versions",
+      "id": "6152",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "app_name": "Snowflake JDBC Driver Add-on for Splunk DB Connect",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "field": "platform_versions",
+      "id": "6153",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1"
+      ],
+      "app_name": "MySQL JDBC Driver Add-on for Splunk DB Connect",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1"
+      ],
+      "field": "platform_versions",
+      "id": "6154",
+      "severity": "error"
+    },
+    {
+      "actual": "July 21, 2026",
+      "app_name": "Splunk_TA_MS_Security",
+      "expected": "November 5, 2026",
+      "field": "latest_release_date",
+      "id": "6207",
+      "severity": "error"
+    },
+    {
+      "actual": "4.0.0",
+      "app_name": "Splunk_TA_MS_Security",
+      "expected": "5.0.0",
+      "field": "latest_release_version",
+      "id": "6207",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2"
+      ],
+      "app_name": "Splunk_TA_MS_Security",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "field": "platform_versions",
+      "id": "6207",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "app_name": "Splunk_TA_github",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "field": "platform_versions",
+      "id": "6254",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "app_name": "Splunk_TA_github",
+      "expected": [],
+      "field": "verified_platform_versions",
+      "id": "6254",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "app_name": "IBM DB2 JDBC Driver Add-on for Splunk DB Connect",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "field": "platform_versions",
+      "id": "6332",
+      "severity": "error"
+    },
+    {
+      "actual": "September 2, 2026",
+      "app_name": "splunk_app_soar",
+      "expected": "November 3, 2026",
+      "field": "latest_release_date",
+      "id": "6361",
+      "severity": "error"
+    },
+    {
+      "actual": "8.7.0",
+      "app_name": "splunk_app_soar",
+      "expected": "8.8.0",
+      "field": "latest_release_version",
+      "id": "6361",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2"
+      ],
+      "app_name": "splunk_app_soar",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2"
+      ],
+      "field": "platform_versions",
+      "id": "6361",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2"
+      ],
+      "app_name": "splunk_app_soar",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2"
+      ],
+      "field": "verified_platform_versions",
+      "id": "6361",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "app_name": "Splunk_TA_okta_identity_cloud",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "field": "platform_versions",
+      "id": "6553",
+      "severity": "error"
+    },
+    {
+      "actual": "July 22, 2026",
+      "app_name": "Splunk_SA_Scientific_Python_darwin_arm64",
+      "expected": "October 13, 2026",
+      "field": "latest_release_date",
+      "id": "6785",
+      "severity": "error"
+    },
+    {
+      "actual": "4.3.4",
+      "app_name": "Splunk_SA_Scientific_Python_darwin_arm64",
+      "expected": "4.3.5",
+      "field": "latest_release_version",
+      "id": "6785",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "app_name": "Splunk_SA_Scientific_Python_darwin_arm64",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "field": "platform_versions",
+      "id": "6785",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1"
+      ],
+      "app_name": "ocsf_cim_addon_for_splunk",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1"
+      ],
+      "field": "platform_versions",
+      "id": "6841",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2"
+      ],
+      "app_name": "splunk_app_stream_ipfix_cisco_hsl",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2"
+      ],
+      "field": "platform_versions",
+      "id": "6872",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2"
+      ],
+      "app_name": "splunk_app_stream_ipfix_cisco_hsl",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2"
+      ],
+      "field": "verified_platform_versions",
+      "id": "6872",
+      "severity": "error"
+    },
+    {
+      "actual": "September 14, 2026",
+      "app_name": "Splunk_TA_SAA",
+      "expected": "November 5, 2026",
+      "field": "latest_release_date",
+      "id": "6999",
+      "severity": "error"
+    },
+    {
+      "actual": "1.3.1",
+      "app_name": "Splunk_TA_SAA",
+      "expected": "1.3.2",
+      "field": "latest_release_version",
+      "id": "6999",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4"
+      ],
+      "app_name": "Splunk_TA_SAA",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4"
+      ],
+      "field": "platform_versions",
+      "id": "6999",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4"
+      ],
+      "app_name": "Splunk_TA_SAA",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4"
+      ],
+      "field": "verified_platform_versions",
+      "id": "6999",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4"
+      ],
+      "app_name": "Splunk_App_SAA",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4"
+      ],
+      "field": "platform_versions",
+      "id": "7000",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "app_name": "MongoDB JDBC Driver Add-on for Splunk DB Connect",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "field": "platform_versions",
+      "id": "7095",
+      "severity": "error"
+    },
+    {
+      "actual": "September 18, 2026",
+      "app_name": "Splunk_TA_otel",
+      "expected": "October 30, 2026",
+      "field": "latest_release_date",
+      "id": "7125",
+      "severity": "error"
+    },
+    {
+      "actual": "0.161.0",
+      "app_name": "Splunk_TA_otel",
+      "expected": "0.164.0",
+      "field": "latest_release_version",
+      "id": "7125",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "app_name": "Splunk_TA_otel",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "field": "platform_versions",
+      "id": "7125",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "app_name": "Splunk_TA_otel",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "field": "verified_platform_versions",
+      "id": "7125",
+      "severity": "error"
+    },
+    {
+      "actual": "June 10, 2026",
+      "app_name": "SplunkAssetRiskIntelligence",
+      "expected": "November 11, 2026",
+      "field": "latest_release_date",
+      "id": "7180",
+      "severity": "error"
+    },
+    {
+      "actual": "1.2.2",
+      "app_name": "SplunkAssetRiskIntelligence",
+      "expected": "1.2.3",
+      "field": "latest_release_version",
+      "id": "7180",
+      "severity": "error"
+    },
+    {
+      "actual": "1.2.2",
+      "app_name": "SplunkAssetRiskIntelligence",
+      "expected": "release present in public release API",
+      "field": "latest_verified_version",
+      "id": "7180",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "app_name": "SplunkAssetRiskIntelligence",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2"
+      ],
+      "field": "platform_versions",
+      "id": "7180",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "app_name": "Splunk Asset and Risk Intelligence Technical Add-on For Windows",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "field": "platform_versions",
+      "id": "7214",
+      "severity": "error"
+    },
+    {
+      "actual": "September 22, 2026",
+      "app_name": "Splunk_AI_Assistant_Cloud",
+      "expected": "October 16, 2026",
+      "field": "latest_release_date",
+      "id": "7245",
+      "severity": "error"
+    },
+    {
+      "actual": "2.3.3",
+      "app_name": "Splunk_AI_Assistant_Cloud",
+      "expected": "2.3.6",
+      "field": "latest_release_version",
+      "id": "7245",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "app_name": "Splunk_AI_Assistant_Cloud",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "field": "platform_versions",
+      "id": "7245",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "app_name": "Splunk_AI_Assistant_Cloud",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "field": "verified_platform_versions",
+      "id": "7245",
+      "severity": "error"
+    },
+    {
+      "actual": "September 17, 2026",
+      "app_name": "CiscoSecurityCloud",
+      "expected": "October 26, 2026",
+      "field": "latest_release_date",
+      "id": "7404",
+      "severity": "error"
+    },
+    {
+      "actual": "3.7.2",
+      "app_name": "CiscoSecurityCloud",
+      "expected": "4.1.3",
+      "field": "latest_release_version",
+      "id": "7404",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1"
+      ],
+      "app_name": "CiscoSecurityCloud",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1"
+      ],
+      "field": "platform_versions",
+      "id": "7404",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1"
+      ],
+      "app_name": "CiscoSecurityCloud",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1"
+      ],
+      "field": "verified_platform_versions",
+      "id": "7404",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "app_name": "Splunk Asset and Risk Intelligence Technical Add-on For Linux",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "field": "platform_versions",
+      "id": "7416",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "app_name": "Splunk Asset and Risk Intelligence Technical Add-on For macOS",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "field": "platform_versions",
+      "id": "7417",
+      "severity": "error"
+    },
+    {
+      "actual": "September 8, 2026",
+      "app_name": "TA_cisco_catalyst",
+      "expected": "October 20, 2026",
+      "field": "latest_release_date",
+      "id": "7538",
+      "severity": "error"
+    },
+    {
+      "actual": "4.0.35",
+      "app_name": "TA_cisco_catalyst",
+      "expected": "4.0.60",
+      "field": "latest_release_version",
+      "id": "7538",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2"
+      ],
+      "app_name": "TA_cisco_catalyst",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2"
+      ],
+      "field": "platform_versions",
+      "id": "7538",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2"
+      ],
+      "app_name": "TA_cisco_catalyst",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2"
+      ],
+      "field": "verified_platform_versions",
+      "id": "7538",
+      "severity": "error"
+    },
+    {
+      "actual": "September 4, 2026",
+      "app_name": "cisco-catalyst-app",
+      "expected": "October 8, 2026",
+      "field": "latest_release_date",
+      "id": "7539",
+      "severity": "error"
+    },
+    {
+      "actual": "4.0.10",
+      "app_name": "cisco-catalyst-app",
+      "expected": "4.0.20",
+      "field": "latest_release_version",
+      "id": "7539",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2"
+      ],
+      "app_name": "cisco-catalyst-app",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2"
+      ],
+      "field": "platform_versions",
+      "id": "7539",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2"
+      ],
+      "app_name": "cisco-catalyst-app",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2"
+      ],
+      "field": "verified_platform_versions",
+      "id": "7539",
+      "severity": "error"
+    },
+    {
+      "actual": "September 10, 2026",
+      "app_name": "TA-cisco-cloud-security-addon",
+      "expected": "October 21, 2026",
+      "field": "latest_release_date",
+      "id": "7569",
+      "severity": "error"
+    },
+    {
+      "actual": "1.0.55",
+      "app_name": "TA-cisco-cloud-security-addon",
+      "expected": "1.0.57",
+      "field": "latest_release_version",
+      "id": "7569",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0"
+      ],
+      "app_name": "TA-cisco-cloud-security-addon",
+      "expected": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4"
+      ],
+      "field": "platform_versions",
+      "id": "7569",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1"
+      ],
+      "app_name": "ta_cisco_thousandeyes",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1"
+      ],
+      "field": "platform_versions",
+      "id": "7719",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1"
+      ],
+      "app_name": "ta_cisco_thousandeyes",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1"
+      ],
+      "field": "verified_platform_versions",
+      "id": "7719",
+      "severity": "error"
+    },
+    {
+      "actual": "July 24, 2026",
+      "app_name": "cisco_dc_networking_app_for_splunk",
+      "expected": "November 3, 2026",
+      "field": "latest_release_date",
+      "id": "7777",
+      "severity": "error"
+    },
+    {
+      "actual": "1.2.2",
+      "app_name": "cisco_dc_networking_app_for_splunk",
+      "expected": "2.0.0",
+      "field": "latest_release_version",
+      "id": "7777",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "app_name": "cisco_dc_networking_app_for_splunk",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4"
+      ],
+      "field": "platform_versions",
+      "id": "7777",
+      "severity": "error"
+    },
+    {
+      "actual": "September 3, 2026",
+      "app_name": "Splunk_MCP_Server",
+      "expected": "October 24, 2026",
+      "field": "latest_release_date",
+      "id": "7931",
+      "severity": "error"
+    },
+    {
+      "actual": "2.0.0",
+      "app_name": "Splunk_MCP_Server",
+      "expected": "2.1.0",
+      "field": "latest_release_version",
+      "id": "7931",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "app_name": "Splunk_MCP_Server",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "field": "platform_versions",
+      "id": "7931",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "app_name": "Splunk_MCP_Server",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "field": "verified_platform_versions",
+      "id": "7931",
+      "severity": "error"
+    },
+    {
+      "actual": "December 16, 2025",
+      "app_name": "Amazon Athena JDBC Driver Add-on for Splunk DB Connect",
+      "expected": "September 23, 2026",
+      "field": "latest_release_date",
+      "id": "8133",
+      "severity": "error"
+    },
+    {
+      "actual": "1.0.1",
+      "app_name": "Amazon Athena JDBC Driver Add-on for Splunk DB Connect",
+      "expected": "1.0.2",
+      "field": "latest_release_version",
+      "id": "8133",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "app_name": "Amazon Athena JDBC Driver Add-on for Splunk DB Connect",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "field": "platform_versions",
+      "id": "8133",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2"
+      ],
+      "app_name": "ta_cisco_spaces",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2"
+      ],
+      "field": "platform_versions",
+      "id": "8485",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4"
+      ],
+      "app_name": "ta_cisco_spaces",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4"
+      ],
+      "field": "verified_platform_versions",
+      "id": "8485",
+      "severity": "error"
+    },
+    {
+      "actual": "August 31, 2026",
+      "app_name": "splunk-cisco-app-navigator",
+      "expected": "November 9, 2026",
+      "field": "latest_release_date",
+      "id": "8566",
+      "severity": "error"
+    },
+    {
+      "actual": "1.0.31",
+      "app_name": "splunk-cisco-app-navigator",
+      "expected": "1.0.50",
+      "field": "latest_release_version",
+      "id": "8566",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2"
+      ],
+      "app_name": "splunk-cisco-app-navigator",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2"
+      ],
+      "field": "platform_versions",
+      "id": "8566",
+      "severity": "error"
+    },
+    {
+      "actual": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4"
+      ],
+      "app_name": "splunk-cisco-app-navigator",
+      "expected": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4"
+      ],
+      "field": "verified_platform_versions",
+      "id": "8566",
+      "severity": "error"
+    },
+    {
+      "actual": "September 18, 2026",
+      "app_name": "Splunk_TA_otel_linux_x86_64",
+      "expected": "October 30, 2026",
+      "field": "latest_release_date",
+      "id": "8698",
+      "severity": "error"
+    },
+    {
+      "actual": "0.161.0",
+      "app_name": "Splunk_TA_otel_linux_x86_64",
+      "expected": "0.164.0",
+      "field": "latest_release_version",
+      "id": "8698",
+      "severity": "error"
+    },
+    {
+      "actual": "September 18, 2026",
+      "app_name": "Splunk_TA_otel_windows_x86_64",
+      "expected": "October 30, 2026",
+      "field": "latest_release_date",
+      "id": "8699",
+      "severity": "error"
+    },
+    {
+      "actual": "0.161.0",
+      "app_name": "Splunk_TA_otel_windows_x86_64",
+      "expected": "0.164.0",
+      "field": "latest_release_version",
+      "id": "8699",
+      "severity": "error"
+    },
+    {
+      "actual": "September 18, 2026",
+      "app_name": "splunk-connect-for-otlp",
+      "expected": "October 30, 2026",
+      "field": "latest_release_date",
+      "id": "8704",
+      "severity": "error"
+    },
+    {
+      "actual": "0.161.0",
+      "app_name": "splunk-connect-for-otlp",
+      "expected": "0.164.0",
+      "field": "latest_release_version",
+      "id": "8704",
+      "severity": "error"
+    }
+  ],
+  "date": "2026-11-16",
+  "scope": "Full-registry public metadata comparison needed to refresh the shared evidence snapshot; no package pins advanced by this metadata operation.",
+  "package_checksums": false
+}

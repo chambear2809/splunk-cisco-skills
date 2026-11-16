@@ -4,13 +4,21 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     cat <<'EOF'
-Usage: bash skills/cisco-scan-setup/scripts/validate.sh [--help]
+Usage: bash skills/cisco-scan-setup/scripts/validate.sh [--completion] [--help]
 
 Validates the deployed Splunk Cisco App Navigator using configured Splunk credentials.
 EOF
     exit 0
 fi
 source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
+
+COMPLETION=false
+for arg in "$@"; do
+    case "${arg}" in
+        --completion) COMPLETION=true ;;
+        *) echo "ERROR: Unknown validation option" >&2; exit 1 ;;
+    esac
+done
 
 APP_NAME="splunk-cisco-app-navigator"
 SYNC_SEARCH_NAME="SCAN - Splunkbase Catalog Sync"
@@ -23,7 +31,13 @@ WARN=0
 
 pass() { log "  PASS: $*"; PASS=$((PASS + 1)); }
 fail() { log "  FAIL: $*"; FAIL=$((FAIL + 1)); }
-warn() { log "  WARN: $*"; WARN=$((WARN + 1)); }
+warn() {
+    if ${COMPLETION}; then
+        fail "$*"
+    else
+        log "  WARN: $*"; WARN=$((WARN + 1))
+    fi
+}
 
 log "=== Splunk Cisco App Navigator (SCAN) Validation ==="
 log ""
@@ -145,6 +159,44 @@ if rest_check_saved_search "${SK}" "${SPLUNK_URI}" "${APP_NAME}" "${SYNC_SEARCH_
     fi
 else
     warn "Sync job '${SYNC_SEARCH_NAME}' not found"
+fi
+
+log ""
+log "--- Shipped Views and Catalog Results ---"
+app_visible=$(splunk_curl "${SK}" "${SPLUNK_URI}/services/apps/local/${APP_NAME}?output_mode=json" 2>/dev/null \
+    | python3 -c 'import json,sys; v=json.load(sys.stdin)["entry"][0]["content"]["visible"]; print("1" if str(v).lower() in ("true", "1") else "0")' 2>/dev/null || echo "0")
+if [[ "${app_visible}" == "1" ]]; then
+    pass "SCAN is visible in Splunk Web"
+else
+    warn "SCAN is hidden or its visibility cannot be verified"
+fi
+views=$(splunk_curl "${SK}" \
+    "${SPLUNK_URI}/servicesNS/nobody/${APP_NAME}/data/ui/views?output_mode=json&count=0" 2>/dev/null \
+    | python3 -c 'import json,sys; print(" ".join(e.get("name", "") for e in json.load(sys.stdin).get("entry", [])))' 2>/dev/null || true)
+for view in ecosystem_intelligence cisco_glass_pane products user_guide; do
+    if [[ " ${views} " == *" ${view} "* ]]; then
+        pass "Shipped view is accessible: ${view}"
+    else
+        warn "Shipped view is missing or inaccessible: ${view}"
+    fi
+done
+# The lookup is app-local (export = none), so dispatch in the same namespace
+# as the shipped dashboards instead of the user's default search app.
+lookup_body=$(form_urlencode_pairs \
+    search "| inputlookup scan_splunkbase_apps | stats count as catalog_rows" \
+    exec_mode oneshot output_mode json)
+lookup_rows=$(splunk_curl_post "${SK}" "${lookup_body}" \
+    "${SPLUNK_URI%/}/servicesNS/nobody/${APP_NAME}/search/jobs" 2>/dev/null \
+    | python3 -c 'import json,sys
+d=json.load(sys.stdin)
+if any(str(m.get("type", "")).lower() == "error" for m in d.get("messages", [])):
+    raise SystemExit(1)
+r=d.get("results", [])
+print(r[0].get("catalog_rows", "0") if r else "0")' 2>/dev/null || echo "0")
+if [[ "${lookup_rows}" =~ ^[0-9]+$ && "${lookup_rows}" -gt 0 ]]; then
+    pass "Dashboard source lookup returns ${lookup_rows} rows"
+else
+    warn "Dashboard source lookup returns no rows; catalog dashboards are not ready"
 fi
 
 log ""

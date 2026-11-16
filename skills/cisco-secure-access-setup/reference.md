@@ -11,8 +11,8 @@ event add-on.
 | Add-on name | `TA-cisco-cloud-security-addon` |
 | Splunkbase IDs | `5558` app, `7569` add-on |
 | Local package patterns | `cisco-secure-access-app-for-splunk_*`, `cisco-secure-access-add-on-for-splunk_*` |
-| Local package in repo | `splunk-ta/cisco-secure-access-app-for-splunk_1053.tgz` |
-| Packaged version inspected | `1.0.53` |
+| Local package in repo | `splunk-ta/cisco-secure-access-app-for-splunk_1060.tar.gz`, `splunk-ta/cisco-secure-access-add-on-for-splunk_1057.tar.gz` |
+| Packaged versions inspected | app `1.0.60` (18 views; SHA-256 `45c6e683f41659552f70f3d49692d67b978a71b362a6ed9374d805a71052d803`); add-on `1.0.57` (4 views; SHA-256 `1c7811dd49976f4a923321f3c02a0dfd04dca1411d66f4c846750f5dffdf13f9`) |
 
 ## Important Note
 

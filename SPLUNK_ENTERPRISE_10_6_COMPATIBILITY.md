@@ -12,10 +12,10 @@ Baseline evidence date: `2026-10-05`. Canonical skills audited: `169`. Newly ver
 | Status | Skills |
 | --- | ---: |
 | blocked | 1 |
-| conditional | 37 |
+| conditional | 39 |
 | delegated | 6 |
 | not-applicable | 66 |
-| supported | 59 |
+| supported | 57 |
 
 ## Complete matrix
 
@@ -28,7 +28,7 @@ Baseline evidence date: `2026-10-05`. Canonical skills audited: `169`. Newly ver
 | `cisco-scan-setup` | supported | 2026-10-05 | 8566 `splunk-cisco-app-navigator` selected `1.0.30` explicitly lists Enterprise 10.6 |
 | `cisco-catalyst-ta-setup` | supported | 2026-10-05 | 7538 `TA_cisco_catalyst` selected `3.2.44` explicitly lists Enterprise 10.6 |
 | `cisco-catalyst-enhanced-netflow-setup` | supported | 2026-10-05 | 6872 `splunk_app_stream_ipfix_cisco_hsl` selected `2.1.0` explicitly lists Enterprise 10.6 |
-| `cisco-appdynamics-setup` | supported | 2026-10-05 | 3471 `Splunk_TA_AppDynamics` selected `3.2.1` explicitly lists Enterprise 10.6 |
+| `cisco-appdynamics-setup` | supported | 2026-10-05 | 3471 `Splunk_TA_AppDynamics` selected `3.3.0` explicitly lists Enterprise 10.6 |
 | `splunk-appdynamics-setup` | delegated | 2026-10-05 | No direct package evidence recorded |
 | `splunk-appdynamics-platform-setup` | not-applicable | 2026-10-05 | No direct package evidence recorded |
 | `splunk-appdynamics-controller-admin-setup` | not-applicable | 2026-10-05 | No direct package evidence recorded |
@@ -50,19 +50,19 @@ Baseline evidence date: `2026-10-05`. Canonical skills audited: `169`. Newly ver
 | `splunk-appdynamics-security-ai-setup` | not-applicable | 2026-10-05 | No direct package evidence recorded |
 | `splunk-appdynamics-sap-agent-setup` | not-applicable | 2026-10-05 | No direct package evidence recorded |
 | `cisco-security-cloud-setup` | supported | 2026-10-05 | 7404 `CiscoSecurityCloud` selected `3.6.10` explicitly lists Enterprise 10.6 |
-| `cisco-secure-access-setup` | conditional | 2026-10-05 | 5558 `cisco-cloud-security` selected `1.0.57` explicitly lists Enterprise 10.6; 7569 `TA-cisco-cloud-security-addon` selected `1.0.53` has no explicit Enterprise 10.6 evidence |
+| `cisco-secure-access-setup` | supported | 2026-11-16 | 5558 `cisco-cloud-security` selected `1.0.60` explicitly lists Enterprise 10.6; 7569 `TA-cisco-cloud-security-addon` selected `1.0.57` explicitly lists Enterprise 10.6 |
 | `cisco-webex-setup` | supported | 2026-10-05 | 8365 `ta_cisco_webex_add_on_for_splunk` selected `1.4.3` explicitly lists Enterprise 10.6; 4992 `cisco_webex_meetings_app_for_splunk` selected `2.0.0` explicitly lists Enterprise 10.6 |
-| `cisco-ucs-ta-setup` | supported | 2026-10-05 | 2731 `Splunk_TA_cisco-ucs` selected `4.3.3` explicitly lists Enterprise 10.6 |
-| `cisco-secure-email-web-gateway-setup` | supported | 2026-10-05 | 1761 `Splunk_TA_cisco-esa` selected `1.7.1` explicitly lists Enterprise 10.6; 1747 `Splunk_TA_cisco-wsa` selected `5.0.0` explicitly lists Enterprise 10.6 |
+| `cisco-ucs-ta-setup` | supported | 2026-10-05 | 2731 `Splunk_TA_cisco-ucs` selected `5.0.0` explicitly lists Enterprise 10.6 |
+| `cisco-secure-email-web-gateway-setup` | supported | 2026-10-05 | 1761 `Splunk_TA_cisco-esa` selected `1.8.0` explicitly lists Enterprise 10.6; 1747 `Splunk_TA_cisco-wsa` selected `5.0.0` explicitly lists Enterprise 10.6 |
 | `cisco-asa-ta-setup` | supported | 2026-10-05 | 1620 `Splunk_TA_cisco-asa` selected `6.1.2` explicitly lists Enterprise 10.6 |
 | `cisco-talos-intelligence-setup` | supported | 2026-10-05 | 7557 `Splunk_TA_Talos_Intelligence` selected `1.0.3` explicitly lists Enterprise 10.6 |
-| `cisco-spaces-setup` | supported | 2026-10-05 | 8485 `ta_cisco_spaces` selected `2.0.1` explicitly lists Enterprise 10.6 |
+| `cisco-spaces-setup` | supported | 2026-10-05 | 8485 `ta_cisco_spaces` selected `2.0.20` explicitly lists Enterprise 10.6 |
 | `cisco-dc-networking-setup` | supported | 2026-10-05 | 7777 `cisco_dc_networking_app_for_splunk` selected `1.2.2` explicitly lists Enterprise 10.6 |
 | `cisco-intersight-setup` | supported | 2026-10-05 | 7828 `Splunk_TA_Cisco_Intersight` selected `3.1.1` explicitly lists Enterprise 10.6 |
-| `cisco-meraki-ta-setup` | supported | 2026-10-05 | 5580 `Splunk_TA_cisco_meraki` selected `3.4.0` explicitly lists Enterprise 10.6 |
+| `cisco-meraki-ta-setup` | supported | 2026-10-05 | 5580 `Splunk_TA_cisco_meraki` selected `3.5.0` explicitly lists Enterprise 10.6 |
 | `cisco-meraki-aam-thousandeyes-setup` | not-applicable | 2026-10-05 | No direct package evidence recorded |
 | `cisco-enterprise-networking-setup` | supported | 2026-10-05 | 7539 `cisco-catalyst-app` selected `3.2.20` explicitly lists Enterprise 10.6 |
-| `cisco-thousandeyes-setup` | supported | 2026-10-05 | 7719 `ta_cisco_thousandeyes` selected `0.8.0` explicitly lists Enterprise 10.6 |
+| `cisco-thousandeyes-setup` | supported | 2026-10-05 | 7719 `ta_cisco_thousandeyes` selected `0.9.0` explicitly lists Enterprise 10.6 |
 | `cisco-thousandeyes-mcp-setup` | not-applicable | 2026-10-05 | No direct package evidence recorded |
 | `cisco-isovalent-platform-setup` | not-applicable | 2026-10-05 | No direct package evidence recorded |
 | `widefield-security-setup` | delegated | 2026-10-05 | No direct package evidence recorded |
@@ -77,14 +77,14 @@ Baseline evidence date: `2026-10-05`. Canonical skills audited: `169`. Newly ver
 | `splunk-enterprise-security-config` | conditional | 2026-10-05 | No direct package evidence recorded |
 | `splunk-security-portfolio-setup` | delegated | 2026-10-05 | No direct package evidence recorded |
 | `splunk-security-essentials-setup` | supported | 2026-10-07 | 3435 `Splunk_Security_Essentials` selected `3.8.3` explicitly lists Enterprise 10.6 |
-| `splunk-security-content-update-setup` | supported | 2026-10-05 | 3449 `DA-ESS-ContentUpdate` selected `6.4.0` explicitly lists Enterprise 10.6 |
+| `splunk-security-content-update-setup` | conditional | 2026-11-16 | 3449 `DA-ESS-ContentUpdate` selected `6.4.0` has no explicit Enterprise 10.6 evidence; newer public `6.10.0` lists 10.6 but is not the selected verified pin |
 | `splunk-lookup-file-editing-setup` | supported | 2026-10-05 | 1724 `lookup_editor` selected `4.0.8` explicitly lists Enterprise 10.6 |
 | `splunk-infosec-app-setup` | supported | 2026-10-05 | 4240 `infosec_app_for_splunk` selected `1.7.2` explicitly lists Enterprise 10.6 |
 | `splunk-pci-compliance-setup` | supported | 2026-10-05 | 1143 `SplunkPCIComplianceSuite` selected `8.6.1` explicitly lists Enterprise 10.6; 2897 `SplunkPCIComplianceSuite_ES` selected `8.6.1` explicitly lists Enterprise 10.6 |
 | `splunk-fraud-analytics-setup` | conditional | 2026-10-05 | No direct package evidence recorded |
-| `splunk-asset-risk-intelligence-setup` | supported | 2026-10-05 | 7180 `SplunkAssetRiskIntelligence` selected `1.2.2` explicitly lists Enterprise 10.6; 7214 `Splunk Asset and Risk Intelligence Technical Add-on For Windows` selected `1.2.0` explicitly lists Enterprise 10.6; 7416 `Splunk Asset and Risk Intelligence Technical Add-on For Linux` selected `1.2.0` explicitly lists Enterprise 10.6; 7417 `Splunk Asset and Risk Intelligence Technical Add-on For macOS` selected `1.2.0` explicitly lists Enterprise 10.6 |
+| `splunk-asset-risk-intelligence-setup` | conditional | 2026-11-16 | 7180 `SplunkAssetRiskIntelligence` selected `1.2.2` has no explicit Enterprise 10.6 evidence; newer public `1.2.3` lists 10.6 but is not the selected verified pin; 7214 `Splunk Asset and Risk Intelligence Technical Add-on For Windows` selected `1.2.0` explicitly lists Enterprise 10.6; 7416 `Splunk Asset and Risk Intelligence Technical Add-on For Linux` selected `1.2.0` explicitly lists Enterprise 10.6; 7417 `Splunk Asset and Risk Intelligence Technical Add-on For macOS` selected `1.2.0` explicitly lists Enterprise 10.6 |
 | `splunk-attack-analyzer-setup` | supported | 2026-10-05 | 6999 `Splunk_TA_SAA` selected `1.3.0` explicitly lists Enterprise 10.6; 7000 `Splunk_App_SAA` selected `1.3.0` explicitly lists Enterprise 10.6 |
-| `splunk-uba-setup` | conditional | 2026-10-05 | 4147 `Splunk-UBA-SA-Kafka` selected `1.4.6` has no explicit Enterprise 10.6 evidence |
+| `splunk-uba-setup` | conditional | 2026-10-05 | 4147 `Splunk-UBA-SA-Kafka` selected `1.4.6` has no explicit Enterprise 10.6 evidence; newer public `1.4.7` lists 10.6 but is not the selected verified pin |
 | `splunk-ai-assistant-setup` | supported | 2026-10-05 | 7245 `Splunk_AI_Assistant_Cloud` selected `2.2.0` explicitly lists Enterprise 10.6 |
 | `splunk-ai-ml-toolkit-setup` | conditional | 2026-10-05 | 2882 `Splunk_SA_Scientific_Python_linux_x86_64` selected `4.3.4` explicitly lists Enterprise 10.6; 2883 `Splunk_SA_Scientific_Python_windows_x86_64` selected `4.3.4` explicitly lists Enterprise 10.6; 2881 `Splunk_SA_Scientific_Python_darwin_x86_64` selected `4.3.4` explicitly lists Enterprise 10.6; 6785 `Splunk_SA_Scientific_Python_darwin_arm64` selected `4.3.4` explicitly lists Enterprise 10.6; 2890 `Splunk_ML_Toolkit` selected `6.0.2` explicitly lists Enterprise 10.6; 4607 `mltk-container` selected `5.2.4` explicitly lists Enterprise 10.6; 6843 `Splunk_App_for_Anomaly_Detection` selected `1.1.2` has no explicit Enterprise 10.6 evidence; 2884 `Splunk_SA_Scientific_Python_linux_x86` selected `1.3` has no explicit Enterprise 10.6 evidence; 6415 `Smart_Alerts_Assistant` selected `0.1.20` has no explicit Enterprise 10.6 evidence |
 | `splunk-mcp-server-setup` | supported | 2026-10-05 | 7931 `Splunk_MCP_Server` selected `1.3.1` explicitly lists Enterprise 10.6 |
@@ -103,13 +103,13 @@ Baseline evidence date: `2026-10-05`. Canonical skills audited: `169`. Newly ver
 | `splunk-microsoft-exchange-ta-setup` | supported | 2026-10-05 | 3225 `TA-Exchange-ClientAccess` selected `4.1.1` explicitly lists Enterprise 10.6; 5663 `SA-ExchangeIndex` selected `4.0.4` explicitly lists Enterprise 10.6 |
 | `splunk-microsoft-scom-ta-setup` | supported | 2026-10-05 | 2729 `Splunk_TA_microsoft-scom` selected `4.5.1` explicitly lists Enterprise 10.6 |
 | `splunk-sysmon-ta-setup` | supported | 2026-10-05 | 5709 `Splunk_TA_microsoft_sysmon` selected `5.0.1` explicitly lists Enterprise 10.6 |
-| `splunk-github-ta-setup` | conditional | 2026-10-05 | 6254 `Splunk_TA_github` selected `4.0.0` has no explicit Enterprise 10.6 evidence |
+| `splunk-github-ta-setup` | conditional | 2026-10-05 | 6254 `Splunk_TA_github` selected `4.0.0` has no explicit Enterprise 10.6 evidence; newer public `4.0.1` lists 10.6 but is not the selected verified pin |
 | `splunk-salesforce-ta-setup` | supported | 2026-10-05 | 3549 `Splunk_TA_salesforce` selected `7.0.0` explicitly lists Enterprise 10.6 |
 | `splunk-box-ta-setup` | supported | 2026-10-05 | 2679 `Splunk_TA_box` selected `5.0.1` explicitly lists Enterprise 10.6 |
-| `splunk-cyberark-ta-setup` | conditional | 2026-10-05 | 5160 `Splunk_TA_cyberark_epm` selected `5.0.0` has no explicit Enterprise 10.6 evidence; 2891 `Splunk_TA_cyberark` selected `1.2.0` explicitly lists Enterprise 10.6 |
+| `splunk-cyberark-ta-setup` | conditional | 2026-10-05 | 5160 `Splunk_TA_cyberark_epm` selected `5.0.0` has no explicit Enterprise 10.6 evidence; newer public `5.0.1` lists 10.6 but is not the selected verified pin; 2891 `Splunk_TA_cyberark` selected `1.2.0` explicitly lists Enterprise 10.6 |
 | `splunk-rsa-securid-ta-setup` | supported | 2026-10-05 | 5210 `Splunk_TA_rsa_securid_cas` selected `1.2.3` explicitly lists Enterprise 10.6; 2958 `Splunk_TA_rsa-securid` selected `1.5.0` explicitly lists Enterprise 10.6 |
 | `splunk-security-appliance-ta-setup` | supported | 2026-10-05 | 2790 `Splunk_TA_bit9-carbonblack` selected `3.0.0` explicitly lists Enterprise 10.6; 2772 `Splunk_TA_symantec-ep` selected `4.0.1` explicitly lists Enterprise 10.6 |
-| `splunk-syslog-web-proxy-ta-setup` | supported | 2026-10-05 | 3186 `Splunk_TA_apache` selected `3.0.0` explicitly lists Enterprise 10.6; 3258 `Splunk_TA_nginx` selected `3.3.2` explicitly lists Enterprise 10.6; 3185 `Splunk_TA_microsoft-iis` selected `2.0.0` explicitly lists Enterprise 10.6; 2911 `Splunk_TA_tomcat` selected `4.0.4` explicitly lists Enterprise 10.6; 3135 `Splunk_TA_haproxy` selected `2.0.0` explicitly lists Enterprise 10.6; 2965 `Splunk_TA_squid` selected `2.1.0` explicitly lists Enterprise 10.6; 2758 `Splunk_TA_bluecoat-proxysg` selected `3.9.0` explicitly lists Enterprise 10.6; 2966 `Splunk_TA_websense-cg` selected `1.1.0` explicitly lists Enterprise 10.6; 5478 `Splunk_TA_checkpoint_log_exporter` selected `1.2.0` explicitly lists Enterprise 10.6; 2680 `Splunk_TA_f5-bigip` selected `7.0.0` explicitly lists Enterprise 10.6; 2770 `Splunk_TA_citrix-netscaler` selected `8.2.5` explicitly lists Enterprise 10.6; 2934 `Splunk_TA_infoblox` selected `2.2.0` explicitly lists Enterprise 10.6 |
+| `splunk-syslog-web-proxy-ta-setup` | conditional | 2026-11-16 | 3186 `Splunk_TA_apache` selected `3.0.0` explicitly lists Enterprise 10.6; 3258 `Splunk_TA_nginx` selected `3.3.2` explicitly lists Enterprise 10.6; 3185 `Splunk_TA_microsoft-iis` selected `2.0.0` explicitly lists Enterprise 10.6; 2911 `Splunk_TA_tomcat` selected `4.0.4` explicitly lists Enterprise 10.6; 3135 `Splunk_TA_haproxy` selected `2.0.0` explicitly lists Enterprise 10.6; 2965 `Splunk_TA_squid` selected `2.1.0` explicitly lists Enterprise 10.6; 2758 `Splunk_TA_bluecoat-proxysg` selected `3.9.0` explicitly lists Enterprise 10.6; 2966 `Splunk_TA_websense-cg` selected `1.1.0` explicitly lists Enterprise 10.6; 5478 `Splunk_TA_checkpoint_log_exporter` selected `1.2.0` explicitly lists Enterprise 10.6; 2680 `Splunk_TA_f5-bigip` selected `7.0.0` explicitly lists Enterprise 10.6; 2770 `Splunk_TA_citrix-netscaler` selected `8.2.5` explicitly lists Enterprise 10.6; 2934 `Splunk_TA_infoblox` selected `2.2.0` has no explicit Enterprise 10.6 evidence; newer public `2.2.1` lists 10.6 but is not the selected verified pin |
 | `splunk-vmware-ta-setup` | supported | 2026-10-05 | 3215 `Splunk_TA_vmware` selected `4.2.1` explicitly lists Enterprise 10.6; 5089 `Splunk_TA_vmware_inframon` selected `5.0.1` explicitly lists Enterprise 10.6 |
 | `splunk-database-ta-setup` | supported | 2026-10-05 | 2648 `Splunk_TA_microsoft-sqlserver` selected `3.1.0` explicitly lists Enterprise 10.6; 2848 `Splunk_TA_mysql` selected `3.2.0` explicitly lists Enterprise 10.6; 1910 `Splunk_TA_oracle` selected `4.2.0` explicitly lists Enterprise 10.6 |
 | `splunk-netapp-ontap-ta-setup` | supported | 2026-10-05 | 3418 `Splunk_TA_ontap` selected `3.2.1` explicitly lists Enterprise 10.6; 5615 `TA-ONTAP-FieldExtractions` selected `3.0.3` explicitly lists Enterprise 10.6; 5616 `SA-ONTAPIndex` selected `3.0.3` explicitly lists Enterprise 10.6 |
@@ -167,7 +167,7 @@ Baseline evidence date: `2026-10-05`. Canonical skills audited: `169`. Newly ver
 | `splunk-observability-cisco-ai-pod-integration` | not-applicable | 2026-10-05 | No direct package evidence recorded |
 | `splunk-observability-aws-integration` | not-applicable | 2026-10-05 | No direct package evidence recorded |
 | `splunk-observability-azure-integration` | not-applicable | 2026-10-05 | 3110 `Splunk_TA_microsoft-cloudservices` selected `6.3.1` explicitly lists Enterprise 10.6; 4882 `microsoft_azure_app` selected `2.1.1` explicitly lists Enterprise 10.6 |
-| `splunk-observability-gcp-integration` | not-applicable | 2026-10-05 | 3088 `Splunk_TA_google-cloudplatform` selected `5.1.1` has no explicit Enterprise 10.6 evidence |
+| `splunk-observability-gcp-integration` | not-applicable | 2026-10-05 | 3088 `Splunk_TA_google-cloudplatform` selected `5.1.1` has no explicit Enterprise 10.6 evidence; newer public `5.2.0` lists 10.6 but is not the selected verified pin |
 | `splunk-observability-aws-lambda-apm-setup` | not-applicable | 2026-10-05 | No direct package evidence recorded |
 | `splunk-observability-dashboard-builder` | not-applicable | 2026-10-05 | No direct package evidence recorded |
 | `splunk-observability-deep-native-workflows` | not-applicable | 2026-10-05 | No direct package evidence recorded |

@@ -6,8 +6,8 @@ description: "Use when the user asks to install, upgrade, review, or validate ES
   correlation-search activation review, and ES configuration handoff."
 compatibility: "Splunk Cloud Platform 10.5.2605: conditional. Follow documented package, entitlement, topology, and customer-managed runtime guardrails; self-managed paths use the separate Enterprise 10.6 compatibility contract."
 metadata:
-  splunk_enterprise_10_6: "supported"
-  enterprise_compatibility_verified: "2026-10-05"
+  splunk_enterprise_10_6: "conditional"
+  enterprise_compatibility_verified: "2026-11-16"
   splunk_cloud_10_5: "conditional"
   compatibility_verified: "2026-08-20"
 ---
@@ -124,3 +124,12 @@ bash skills/splunk-security-content-update-setup/scripts/validate.sh \
 ```
 
 See `reference.md` for ESCU placement and activation-review guardrails.
+
+## Historical package evidence boundary
+
+The 2026-11-16 shared Splunkbase metadata refresh found that a selected package
+for this workflow is no longer returned by the public release API. Its pin is
+retained with historical-only provenance; current Enterprise 10.6 compatibility
+is conditional on independent exact-package and platform approval. Public
+latest compatibility does not prove support for that selected historical pin.
+See the [registry evidence policy](../shared/references/splunkbase_registry_evidence.md).

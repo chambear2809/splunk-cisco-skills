@@ -113,9 +113,12 @@ to verify the catalog, run the initial sync, and validate the deployment.
 
 ### Package Verification Boundary
 
-The reviewed SCAN baseline is `1.0.30`, which is also the current public
-release. That package was downloaded, unpacked, and inspected here, so the
-shared installer's default pin needs no review override. Local catalog
+The selected SCAN baseline remains `1.0.30`; the listing default on
+2026-11-16 is `1.0.50`. The latter archive was downloaded and statically
+inspected, but its `commands.conf` requires Python 3.13 for both sync commands.
+Confirm the target search tier supplies that runtime and validate all four
+views before adopting it. See the [dated package review](../../docs/cisco-package-review-scan-2026-11-16.md).
+Local catalog
 generation still does not upgrade or approve the app package: fixture refresh
 and package review remain separate controls. When Splunkbase publishes a newer
 release, re-check `products.conf`, lookup/sync behavior, saved searches, and
@@ -166,6 +169,13 @@ No environment variables or command-line password arguments are needed:
 ```bash
 bash skills/cisco-scan-setup/scripts/validate.sh
 ```
+
+Use `--completion` for the final handoff. It fails when catalog results,
+the shipped views, the lookup, or the scheduled sync prerequisites are missing.
+The management app has no modular inputs or event index to validate; open the
+catalog and Ecosystem Intelligence views and retain their rendered results as
+the final UI evidence. REST view discovery and a nonempty lookup alone do not
+prove every dashboard panel has rendered successfully.
 
 If credentials are not yet configured, run the setup script first:
 

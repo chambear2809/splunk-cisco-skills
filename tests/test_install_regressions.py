@@ -166,7 +166,7 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             apps = {
                 "7538": ("TA_cisco_catalyst", "3.1.0"),
                 "7539": ("cisco-catalyst-app", "3.2.0"),
-                "1761": ("Splunk_TA_cisco-esa", "1.7.1"),
+                "1761": ("Splunk_TA_cisco-esa", "1.8.0"),
             }
 
             if "config current-stack" in cmd:
@@ -1722,7 +1722,7 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             tmp_path = Path(tmpdir)
             env, acs_log = self.build_selected_release_cloud_env(tmp_path)
 
-            # 1761 1.7.1 is package-verified and reproducible from the public release
+            # 1761 1.8.0 is package-verified and reproducible from the public release
             # API, so the default pin path installs with no acknowledgement flags.
             accepted = self.run_script(
                 "skills/splunk-app-install/scripts/install_app.sh",
@@ -1737,7 +1737,7 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             accepted_output = accepted.stdout + accepted.stderr
             self.assertEqual(accepted.returncode, 0, msg=accepted_output)
             self.assertIn(
-                "Splunk_TA_cisco-esa version 1.7.1 (repo-verified) advertises Splunk 10.5",
+                "Splunk_TA_cisco-esa version 1.8.0 (repo-verified) advertises Splunk 10.5",
                 accepted_output,
             )
             self.assertNotIn("historical-review-only", accepted_output)
@@ -1746,7 +1746,7 @@ class InstallRegressionTests(ShellScriptRegressionBase):
                 for line in acs_log.read_text(encoding="utf-8").splitlines()
                 if "apps install splunkbase --splunkbase-id 1761" in line
             )
-            self.assertIn("--version 1.7.1", install_line)
+            self.assertIn("--version 1.8.0", install_line)
 
     def test_cloud_batch_installs_reproducible_verified_pin_without_overrides(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -1762,7 +1762,7 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             accepted_output = accepted.stdout + accepted.stderr
             self.assertEqual(accepted.returncode, 0, msg=accepted_output)
             self.assertIn(
-                "Splunk_TA_cisco-esa version 1.7.1 (repo-verified) advertises Splunk 10.5",
+                "Splunk_TA_cisco-esa version 1.8.0 (repo-verified) advertises Splunk 10.5",
                 accepted_output,
             )
             self.assertNotIn("historical-review-only", accepted_output)
@@ -1771,10 +1771,10 @@ class InstallRegressionTests(ShellScriptRegressionBase):
                 for line in acs_log.read_text(encoding="utf-8").splitlines()
                 if "apps install splunkbase --splunkbase-id 1761" in line
             )
-            self.assertIn("--version 1.7.1", install_line)
+            self.assertIn("--version 1.8.0", install_line)
 
-    def test_no_registry_pin_claims_historical_review_only_provenance(self):
-        """Every verified pin must be reproducible from the public release API."""
+    def test_current_historical_pin_inventory_remains_explicit(self):
+        """Pins missing from the public API retain their explicit historical gate."""
         registry = json.loads(
             (REPO_ROOT / "skills/shared/app_registry.json").read_text(encoding="utf-8")
         )
@@ -1791,16 +1791,18 @@ class InstallRegressionTests(ShellScriptRegressionBase):
         self.assertEqual(
             historical,
             [
+                "2934/Splunk_TA_infoblox",
                 "3088/Splunk_TA_google-cloudplatform",
+                "3449/DA-ESS-ContentUpdate",
                 "5160/Splunk_TA_cyberark_epm",
                 "6254/Splunk_TA_github",
-                "7569/TA-cisco-cloud-security-addon",
+                "7180/SplunkAssetRiskIntelligence",
                 "8704/splunk-connect-for-otlp",
             ],
         )
 
     def test_historical_review_only_pin_gate_stays_wired_in_both_installers(self):
-        """The acknowledgement gate must survive even with no historical pins today."""
+        """Both installers must retain the independent historical acknowledgement gate."""
         for script in (
             "skills/splunk-app-install/scripts/install_app.sh",
             "skills/shared/scripts/cloud_batch_install.sh",
@@ -2063,7 +2065,7 @@ class InstallRegressionTests(ShellScriptRegressionBase):
                     raise SystemExit(0)
 
                 if cmd == "apps describe Splunk_AI_Assistant_Cloud":
-                    print(json.dumps({"name": "Splunk_AI_Assistant_Cloud", "version": "2.3.3", "status": "updated"}))
+                    print(json.dumps({"name": "Splunk_AI_Assistant_Cloud", "version": "2.3.6", "status": "updated"}))
                     raise SystemExit(0)
 
                 if cmd.startswith("apps install splunkbase --splunkbase-id 7245"):

@@ -1,0 +1,2660 @@
+{
+  "date": "2026-11-16",
+  "candidate_count": 184,
+  "covered_count": 52,
+  "coverage_rule": "Whole product words, catalog package relationships, or exact Cisco skill registry entries; source metadata alone does not establish publisher ownership or package approval.",
+  "packages": [
+    {
+      "splunkbase_id": "669",
+      "listing_url": "https://splunkbase.splunk.com/app/669/",
+      "title": "Cisco CDR Reporting and Analytics",
+      "publisher": "Sideview, LLC - Partner",
+      "support": "developer",
+      "package_type": "app",
+      "license": {
+        "canonicalName": "Sideview Trial Internal Use License Agreement",
+        "displayName": "Sideview Trial Internal Use License Agreement",
+        "url": "https://sideviewapps.com/sideview-trial-internal-use-license-agreement/"
+      },
+      "listing_default_version": "9.1.0",
+      "listing_default_date": "2026-11-12T23:57:53.604296Z",
+      "release_api_url": "https://splunkbase.splunk.com/api/v1/app/669/release/125427/",
+      "release_api_crosscheck": "matched",
+      "enterprise_advertised": true,
+      "cloud_advertised": true,
+      "platform_versions": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "newer_parallel_releases": [],
+      "registry_entry": null,
+      "relationships": [],
+      "inspected_packages": [],
+      "disposition": "Sideview third-party package: cisco-collaboration-setup offers evidence-only selection; exact version, tier, license and receiver gates apply."
+    },
+    {
+      "splunkbase_id": "1620",
+      "listing_url": "https://splunkbase.splunk.com/app/1620/",
+      "title": "Splunk Add-on for Cisco ASA",
+      "publisher": "Splunk LLC",
+      "support": "splunk",
+      "package_type": "addon",
+      "license": {
+        "canonicalName": "Splunk General Terms",
+        "displayName": "Splunk General Terms",
+        "url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html"
+      },
+      "listing_default_version": "6.1.2",
+      "listing_default_date": "2026-07-29T16:21:51.545061Z",
+      "release_api_url": "https://splunkbase.splunk.com/api/v1/app/1620/release/123030/",
+      "release_api_crosscheck": "matched",
+      "enterprise_advertised": true,
+      "cloud_advertised": true,
+      "platform_versions": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "newer_parallel_releases": [],
+      "registry_entry": {
+        "skill": "cisco-asa-ta-setup",
+        "app_name": "Splunk_TA_cisco-asa",
+        "splunkbase_id": "1620",
+        "latest_verified_version": "6.1.2"
+      },
+      "relationships": [],
+      "inspected_packages": [
+        {
+          "package_version": "6.1.2",
+          "binary_sha256": "dbe93977b84b05c609665d3ec5db3297aae80f3b2d67b6645c3a763a7257d7fa",
+          "evidence_reports": [
+            "cisco-package-review-security-2026-11-16.md"
+          ]
+        }
+      ],
+      "disposition": "Exact registry workflow. Complete ingest/dashboard gates; retain documented holds when selected pin differs from default."
+    },
+    {
+      "splunkbase_id": "1711",
+      "listing_url": "https://splunkbase.splunk.com/app/1711/",
+      "title": "Cisco Meraki Presence Modular Input",
+      "publisher": "BaboonBones Ltd",
+      "support": "developer",
+      "package_type": "addon",
+      "license": {
+        "canonicalName": "Apache 2",
+        "displayName": "Apache 2",
+        "url": "http://www.opensource.org/licenses/Apache-2.0"
+      },
+      "listing_default_version": "null",
+      "listing_default_date": "2022-04-11T19:24:57.897534Z",
+      "release_api_url": "https://splunkbase.splunk.com/api/v1/app/1711/release/24927/",
+      "release_api_crosscheck": "matched",
+      "enterprise_advertised": true,
+      "cloud_advertised": false,
+      "platform_versions": [],
+      "newer_parallel_releases": [],
+      "registry_entry": null,
+      "relationships": [],
+      "inspected_packages": [],
+      "disposition": "Use-case scope: cisco-meraki-ta-setup. Meraki telemetry is covered; the legacy presence-specific collector requires independent API and privacy qualification. Exact package is unapproved; no automated install/configuration is claimed."
+    },
+    {
+      "splunkbase_id": "1747",
+      "listing_url": "https://splunkbase.splunk.com/app/1747/",
+      "title": "Splunk Add-on for Cisco WSA",
+      "publisher": "Splunk LLC",
+      "support": "splunk",
+      "package_type": "addon",
+      "license": {
+        "canonicalName": "Splunk General Terms",
+        "displayName": "Splunk General Terms",
+        "url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html"
+      },
+      "listing_default_version": "5.0.0",
+      "listing_default_date": "2024-12-13T14:30:36.932722Z",
+      "release_api_url": "https://splunkbase.splunk.com/api/v1/app/1747/release/35946/",
+      "release_api_crosscheck": "matched",
+      "enterprise_advertised": true,
+      "cloud_advertised": true,
+      "platform_versions": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1"
+      ],
+      "newer_parallel_releases": [],
+      "registry_entry": {
+        "skill": "cisco-secure-email-web-gateway-setup",
+        "app_name": "Splunk_TA_cisco-wsa",
+        "splunkbase_id": "1747",
+        "latest_verified_version": "5.0.0"
+      },
+      "relationships": [
+        {
+          "product": "Cisco Web Security Appliance (WSA)",
+          "relationship": "addon_uid",
+          "use_case_skill": "cisco-secure-email-web-gateway-setup"
+        }
+      ],
+      "inspected_packages": [
+        {
+          "package_version": "5.0.0",
+          "binary_sha256": "7656262355aac65d1e5cf4dac3499ca3864b7e90258a82207265db404465454d",
+          "evidence_reports": [
+            "cisco-package-review-security-2026-11-16.md"
+          ]
+        }
+      ],
+      "disposition": "Exact registry workflow. Complete ingest/dashboard gates; retain documented holds when selected pin differs from default."
+    },
+    {
+      "splunkbase_id": "1761",
+      "listing_url": "https://splunkbase.splunk.com/app/1761/",
+      "title": "Splunk Add-on for Cisco ESA",
+      "publisher": "Splunk LLC",
+      "support": "splunk",
+      "package_type": "addon",
+      "license": {
+        "canonicalName": "Splunk General Terms",
+        "displayName": "Splunk General Terms",
+        "url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html"
+      },
+      "listing_default_version": "1.8.0",
+      "listing_default_date": "2026-10-12T06:31:49.953334Z",
+      "release_api_url": "https://splunkbase.splunk.com/api/v1/app/1761/release/124672/",
+      "release_api_crosscheck": "matched",
+      "enterprise_advertised": true,
+      "cloud_advertised": true,
+      "platform_versions": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1"
+      ],
+      "newer_parallel_releases": [],
+      "registry_entry": {
+        "skill": "cisco-secure-email-web-gateway-setup",
+        "app_name": "Splunk_TA_cisco-esa",
+        "splunkbase_id": "1761",
+        "latest_verified_version": "1.8.0"
+      },
+      "relationships": [
+        {
+          "product": "Cisco Secure Email Gateway (ESA)",
+          "relationship": "addon_uid",
+          "use_case_skill": "cisco-secure-email-web-gateway-setup"
+        }
+      ],
+      "inspected_packages": [
+        {
+          "package_version": "1.8.0",
+          "binary_sha256": "486010da6765b8eb63b616912b38a0186c80c95ef7dc3f74e19592346bdb1a5a",
+          "evidence_reports": [
+            "cisco-package-review-security-2026-11-16.md"
+          ]
+        }
+      ],
+      "disposition": "Exact registry workflow. Complete ingest/dashboard gates; retain documented holds when selected pin differs from default."
+    },
+    {
+      "splunkbase_id": "1809",
+      "listing_url": "https://splunkbase.splunk.com/app/1809/",
+      "title": "Splunk App for Stream",
+      "publisher": "Splunk LLC",
+      "support": "splunk",
+      "package_type": "app",
+      "license": {
+        "canonicalName": "Splunk General Terms",
+        "displayName": "Splunk General Terms",
+        "url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html"
+      },
+      "listing_default_version": "8.1.7",
+      "listing_default_date": "2026-10-12T16:39:05.206380Z",
+      "release_api_url": "https://splunkbase.splunk.com/api/v1/app/1809/release/124685/",
+      "release_api_crosscheck": "matched",
+      "enterprise_advertised": true,
+      "cloud_advertised": true,
+      "platform_versions": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4"
+      ],
+      "newer_parallel_releases": [],
+      "registry_entry": {
+        "skill": "splunk-stream-setup",
+        "app_name": "splunk_app_stream",
+        "splunkbase_id": "1809",
+        "latest_verified_version": "8.1.6"
+      },
+      "relationships": [
+        {
+          "product": "Cisco NetFlow/IPFIX receiver path",
+          "relationship": "optional Stream collection dependency",
+          "use_case_skill": "splunk-stream-setup"
+        }
+      ],
+      "inspected_packages": [
+        {
+          "package_version": "8.1.7",
+          "binary_sha256": "97bd05dede16195f868f102020676cd640490b05bfc153d2fd30ebc77e78d5af",
+          "evidence_reports": [
+            "cisco-package-review-network-dc-2026-11-16.md"
+          ]
+        }
+      ],
+      "disposition": "Exact registry workflow. Complete ingest/dashboard gates; retain documented holds when selected pin differs from default."
+    },
+    {
+      "splunkbase_id": "1915",
+      "listing_url": "https://splunkbase.splunk.com/app/1915/",
+      "title": "Splunk Add-on for Cisco Identity Services",
+      "publisher": "Splunk LLC",
+      "support": "splunk",
+      "package_type": "addon",
+      "license": {
+        "canonicalName": "Splunk General Terms",
+        "displayName": "Splunk General Terms",
+        "url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html"
+      },
+      "listing_default_version": "5.0.1",
+      "listing_default_date": "2026-11-03T11:17:45.926922Z",
+      "release_api_url": "https://splunkbase.splunk.com/api/v1/app/1915/release/125195/",
+      "release_api_crosscheck": "matched",
+      "enterprise_advertised": true,
+      "cloud_advertised": true,
+      "platform_versions": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "newer_parallel_releases": [],
+      "registry_entry": null,
+      "relationships": [],
+      "inspected_packages": [
+        {
+          "package_version": "5.0.1",
+          "binary_sha256": "4ece73ae658a76d2141b562c3e30a1a9dbbfbbdd2f30091fc8ce716f5c28865b",
+          "evidence_reports": [
+            "cisco-package-review-security-2026-11-16.md"
+          ]
+        }
+      ],
+      "disposition": "Splunk-developed ISE parser; existing Catalyst ISE API/parser route is a different package. Separate parser/transport, CIM and migration qualification needed."
+    },
+    {
+      "splunkbase_id": "2731",
+      "listing_url": "https://splunkbase.splunk.com/app/2731/",
+      "title": "Splunk Add-on for Cisco UCS",
+      "publisher": "Splunk LLC",
+      "support": "splunk",
+      "package_type": "addon",
+      "license": {
+        "canonicalName": "Splunk General Terms",
+        "displayName": "Splunk General Terms",
+        "url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html"
+      },
+      "listing_default_version": "5.0.0",
+      "listing_default_date": "2026-10-21T11:44:21.150589Z",
+      "release_api_url": "https://splunkbase.splunk.com/api/v1/app/2731/release/124892/",
+      "release_api_crosscheck": "matched",
+      "enterprise_advertised": true,
+      "cloud_advertised": true,
+      "platform_versions": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1"
+      ],
+      "newer_parallel_releases": [],
+      "registry_entry": {
+        "skill": "cisco-ucs-ta-setup",
+        "app_name": "Splunk_TA_cisco-ucs",
+        "splunkbase_id": "2731",
+        "latest_verified_version": "5.0.0"
+      },
+      "relationships": [
+        {
+          "product": "Cisco Unified Computing System (UCS)",
+          "relationship": "addon_uid",
+          "use_case_skill": "cisco-ucs-ta-setup"
+        }
+      ],
+      "inspected_packages": [
+        {
+          "package_version": "5.0.0",
+          "binary_sha256": "dbda2c808b0cd56881e34b43c07ccfb0d6de4ec8623e9ffc6d6356efae181570",
+          "evidence_reports": [
+            "cisco-package-review-network-dc-2026-11-16.md"
+          ]
+        }
+      ],
+      "disposition": "Exact registry workflow. Complete ingest/dashboard gates; retain documented holds when selected pin differs from default."
+    },
+    {
+      "splunkbase_id": "2992",
+      "listing_url": "https://splunkbase.splunk.com/app/2992/",
+      "title": "Cisco Endpoint Security Analytics (CESA)",
+      "publisher": "Cisco Systems",
+      "support": "not_supported",
+      "package_type": "app",
+      "license": {
+        "canonicalName": "Cisco Supplemental End User License",
+        "displayName": "Cisco Supplemental End User License",
+        "url": "https://www.cisco.com/c/dam/en_us/about/doing_business/legal/seula/anyconnect-SEULA-v4x.pdf"
+      },
+      "listing_default_version": "4.0.8",
+      "listing_default_date": "2025-06-25T17:31:41.489021Z",
+      "release_api_url": "https://splunkbase.splunk.com/api/v1/app/2992/release/38328/",
+      "release_api_crosscheck": "matched",
+      "enterprise_advertised": true,
+      "cloud_advertised": true,
+      "platform_versions": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2"
+      ],
+      "newer_parallel_releases": [],
+      "registry_entry": null,
+      "relationships": [
+        {
+          "product": "Splunkbase 4221",
+          "related_splunkbase_id": "4221",
+          "relationship": "CESA parser and external nvzFlow collector bundle",
+          "use_case_skill": null,
+          "source": "dated package review; not an inferred install_requires dependency"
+        }
+      ],
+      "inspected_packages": [
+        {
+          "package_version": "4.0.8",
+          "binary_sha256": "81bb9b505071fbcf037844ea2aef6261a90c2f2839d268186bd2be2e1b7b6843",
+          "evidence_reports": [
+            "cisco-package-review-security-2026-11-16.md"
+          ]
+        }
+      ],
+      "disposition": "Cisco-authored CESA, not_supported. Endpoint license/SEULA and external nvzFlow collector qualification required; Security Cloud NVM overlap does not establish equivalence."
+    },
+    {
+      "splunkbase_id": "3471",
+      "listing_url": "https://splunkbase.splunk.com/app/3471/",
+      "title": "Cisco Splunk Add-on for AppDynamics",
+      "publisher": "Splunk Works",
+      "support": "developer",
+      "package_type": "addon",
+      "license": {
+        "canonicalName": "Cisco End User License",
+        "displayName": "Cisco End User License",
+        "url": "https://www.cisco.com/c/dam/en_us/about/doing_business/docs/test/EULA_EN.pdf"
+      },
+      "listing_default_version": "3.3.0",
+      "listing_default_date": "2026-10-22T20:13:54.974077Z",
+      "release_api_url": "https://splunkbase.splunk.com/api/v1/app/3471/release/124938/",
+      "release_api_crosscheck": "matched",
+      "enterprise_advertised": true,
+      "cloud_advertised": true,
+      "platform_versions": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0"
+      ],
+      "newer_parallel_releases": [],
+      "registry_entry": {
+        "skill": "cisco-appdynamics-setup",
+        "app_name": "Splunk_TA_AppDynamics",
+        "splunkbase_id": "3471",
+        "latest_verified_version": "3.3.0"
+      },
+      "relationships": [
+        {
+          "product": "Cisco AppDynamics (AppD)",
+          "relationship": "addon_uid",
+          "use_case_skill": "cisco-appdynamics-setup"
+        }
+      ],
+      "inspected_packages": [
+        {
+          "package_version": "3.3.0",
+          "binary_sha256": "ee7f6de3160a1a4cdf5c1193484dd23e8d4f2fb6e91c9990456259e82068a7e6",
+          "evidence_reports": [
+            "cisco-package-review-security-2026-11-16.md"
+          ]
+        }
+      ],
+      "disposition": "Exact registry workflow. Complete ingest/dashboard gates; retain documented holds when selected pin differs from default."
+    },
+    {
+      "splunkbase_id": "4221",
+      "listing_url": "https://splunkbase.splunk.com/app/4221/",
+      "title": "Cisco Endpoint Security Analytics (CESA) Add-On for Splunk",
+      "publisher": "Cisco Systems",
+      "support": "not_supported",
+      "package_type": "addon",
+      "license": {
+        "canonicalName": "Cisco Supplemental End User License",
+        "displayName": "Cisco Supplemental End User License",
+        "url": "https://www.cisco.com/c/dam/en_us/about/doing_business/legal/seula/anyconnect-SEULA-v4x.pdf"
+      },
+      "listing_default_version": "4.0.7",
+      "listing_default_date": "2025-06-25T17:27:35.960112Z",
+      "release_api_url": "https://splunkbase.splunk.com/api/v1/app/4221/release/38327/",
+      "release_api_crosscheck": "matched",
+      "enterprise_advertised": true,
+      "cloud_advertised": true,
+      "platform_versions": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2"
+      ],
+      "newer_parallel_releases": [],
+      "registry_entry": null,
+      "relationships": [
+        {
+          "product": "Splunkbase 2992",
+          "related_splunkbase_id": "2992",
+          "relationship": "CESA visualization companion",
+          "use_case_skill": null,
+          "source": "dated package review; not an inferred install_requires dependency"
+        }
+      ],
+      "inspected_packages": [
+        {
+          "package_version": "4.0.7",
+          "binary_sha256": "55d26467bfea9ca4225eb0c789a05cfddfc2d4fbb74c7a7b4f206786e7111e42",
+          "evidence_reports": [
+            "cisco-package-review-security-2026-11-16.md"
+          ]
+        }
+      ],
+      "disposition": "Cisco-authored CESA, not_supported. Endpoint license/SEULA and external nvzFlow collector qualification required; Security Cloud NVM overlap does not establish equivalence."
+    },
+    {
+      "splunkbase_id": "4434",
+      "listing_url": "https://splunkbase.splunk.com/app/4434/",
+      "title": "TA for Cisco CDR Reporting and Analytics",
+      "publisher": "Sideview, LLC - Partner",
+      "support": "developer",
+      "package_type": "addon",
+      "license": {
+        "canonicalName": "Sideview Free Internal License Agreement",
+        "displayName": "Sideview Free Internal License Agreement",
+        "url": "https://sideviewapps.com/sideview-free-internal-license-agreement/"
+      },
+      "listing_default_version": "8.4.0",
+      "listing_default_date": "2026-07-28T19:09:52.095056Z",
+      "release_api_url": "https://splunkbase.splunk.com/api/v1/app/4434/release/122999/",
+      "release_api_crosscheck": "matched",
+      "enterprise_advertised": true,
+      "cloud_advertised": true,
+      "platform_versions": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2"
+      ],
+      "newer_parallel_releases": [],
+      "registry_entry": null,
+      "relationships": [],
+      "inspected_packages": [],
+      "disposition": "Sideview third-party package: cisco-collaboration-setup offers evidence-only selection; exact version, tier, license and receiver gates apply."
+    },
+    {
+      "splunkbase_id": "4992",
+      "listing_url": "https://splunkbase.splunk.com/app/4992/",
+      "title": "Webex App for Splunk",
+      "publisher": "Splunk Field Solutions",
+      "support": "developer",
+      "package_type": "app",
+      "license": {
+        "canonicalName": "Apache 2.0",
+        "displayName": "Apache 2.0",
+        "url": "https://github.com/splunk/webex_analytics_app/blob/master/LICENSE.md"
+      },
+      "listing_default_version": "2.0.0",
+      "listing_default_date": "2026-04-30T18:54:06.295503Z",
+      "release_api_url": "https://splunkbase.splunk.com/api/v1/app/4992/release/42688/",
+      "release_api_crosscheck": "matched",
+      "enterprise_advertised": true,
+      "cloud_advertised": true,
+      "platform_versions": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "newer_parallel_releases": [],
+      "registry_entry": {
+        "skill": "cisco-webex-setup",
+        "app_name": "cisco_webex_meetings_app_for_splunk",
+        "splunkbase_id": "4992",
+        "latest_verified_version": "2.0.0"
+      },
+      "relationships": [
+        {
+          "product": "Splunkbase 8365",
+          "related_splunkbase_id": "8365",
+          "relationship": "customer-managed collection companion; Enterprise-only",
+          "use_case_skill": "cisco-webex-setup",
+          "source": "dated package review; not an inferred install_requires dependency"
+        }
+      ],
+      "inspected_packages": [
+        {
+          "package_version": "2.0.0",
+          "binary_sha256": "baed5c01c8cd5dba99f76962cb81e6f161ee677be800b01065efe1553a2974df",
+          "evidence_reports": [
+            "cisco-package-review-security-2026-11-16.md"
+          ]
+        }
+      ],
+      "disposition": "Exact registry workflow. Complete ingest/dashboard gates; retain documented holds when selected pin differs from default."
+    },
+    {
+      "splunkbase_id": "5116",
+      "listing_url": "https://splunkbase.splunk.com/app/5116/",
+      "title": "MIME Decoder Add-on for Cisco ESA",
+      "publisher": "Tomas Moser",
+      "support": "developer",
+      "package_type": "addon",
+      "license": {
+        "canonicalName": "End User License Agreement for Third-Party Content",
+        "displayName": "End User License Agreement for Third-Party Content",
+        "url": "https://cdn.splunkbase.splunk.com/static/misc/eula.html"
+      },
+      "listing_default_version": "1.0.9",
+      "listing_default_date": "2026-01-02T13:49:04.555895Z",
+      "release_api_url": "https://splunkbase.splunk.com/api/v1/app/5116/release/40848/",
+      "release_api_crosscheck": "matched",
+      "enterprise_advertised": true,
+      "cloud_advertised": true,
+      "platform_versions": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "newer_parallel_releases": [],
+      "registry_entry": null,
+      "relationships": [],
+      "inspected_packages": [],
+      "disposition": "Use-case scope: cisco-secure-email-web-gateway-setup. ESA transport/parsing is covered; MIME decoding/search commands remain a distinct unowned extension. Exact package is unapproved; no automated install/configuration is claimed."
+    },
+    {
+      "splunkbase_id": "5234",
+      "listing_url": "https://splunkbase.splunk.com/app/5234/",
+      "title": "Splunk Add-on for Stream Wire Data",
+      "publisher": "Splunk LLC",
+      "support": "splunk",
+      "package_type": "addon",
+      "license": {
+        "canonicalName": "Splunk General Terms",
+        "displayName": "Splunk General Terms",
+        "url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html"
+      },
+      "listing_default_version": "8.1.7",
+      "listing_default_date": "2026-10-12T16:08:27.977018Z",
+      "release_api_url": "https://splunkbase.splunk.com/api/v1/app/5234/release/124684/",
+      "release_api_crosscheck": "matched",
+      "enterprise_advertised": true,
+      "cloud_advertised": true,
+      "platform_versions": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4"
+      ],
+      "newer_parallel_releases": [],
+      "registry_entry": {
+        "skill": "splunk-stream-setup",
+        "app_name": "Splunk_TA_stream_wire_data",
+        "splunkbase_id": "5234",
+        "latest_verified_version": "8.1.6"
+      },
+      "relationships": [
+        {
+          "product": "Cisco NetFlow/IPFIX receiver path",
+          "relationship": "optional Stream collection dependency",
+          "use_case_skill": "splunk-stream-setup"
+        }
+      ],
+      "inspected_packages": [
+        {
+          "package_version": "8.1.7",
+          "binary_sha256": "2734916023b526d49a37977219e2c309cfe60231f4383ebd3a5814abfa904d6e",
+          "evidence_reports": [
+            "cisco-package-review-network-dc-2026-11-16.md"
+          ]
+        }
+      ],
+      "disposition": "Exact registry workflow. Complete ingest/dashboard gates; retain documented holds when selected pin differs from default."
+    },
+    {
+      "splunkbase_id": "5238",
+      "listing_url": "https://splunkbase.splunk.com/app/5238/",
+      "title": "Splunk Add-on for Stream Forwarders",
+      "publisher": "Splunk LLC",
+      "support": "splunk",
+      "package_type": "addon",
+      "license": {
+        "canonicalName": "Splunk General Terms",
+        "displayName": "Splunk General Terms",
+        "url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html"
+      },
+      "listing_default_version": "8.1.7",
+      "listing_default_date": "2026-10-12T15:48:43.051836Z",
+      "release_api_url": "https://splunkbase.splunk.com/api/v1/app/5238/release/124683/",
+      "release_api_crosscheck": "matched",
+      "enterprise_advertised": true,
+      "cloud_advertised": false,
+      "platform_versions": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4"
+      ],
+      "newer_parallel_releases": [],
+      "registry_entry": {
+        "skill": "splunk-stream-setup",
+        "app_name": "Splunk_TA_stream",
+        "splunkbase_id": "5238",
+        "latest_verified_version": "8.1.6",
+        "relationship": "customer-managed-runtime"
+      },
+      "relationships": [
+        {
+          "product": "Cisco NetFlow/IPFIX receiver path",
+          "relationship": "optional Stream collection dependency",
+          "use_case_skill": "splunk-stream-setup"
+        }
+      ],
+      "inspected_packages": [
+        {
+          "package_version": "8.1.7",
+          "binary_sha256": "455e34ad2ab7012d34e498dbeb2f40e994327ec2504f45b4248bb2402572a146",
+          "evidence_reports": [
+            "cisco-package-review-network-dc-2026-11-16.md"
+          ]
+        }
+      ],
+      "disposition": "Exact registry workflow. Complete ingest/dashboard gates; retain documented holds when selected pin differs from default."
+    },
+    {
+      "splunkbase_id": "5543",
+      "listing_url": "https://splunkbase.splunk.com/app/5543/",
+      "title": "CCX Unified Add-on for Cisco Firepower",
+      "publisher": "Henrique Linsmeyer",
+      "support": "developer",
+      "package_type": "addon",
+      "license": {
+        "canonicalName": "CyberCX End User License Agreement",
+        "displayName": "CyberCX End User License Agreement",
+        "url": "http://www.cybercx.com.au"
+      },
+      "listing_default_version": "1.1.3",
+      "listing_default_date": "2025-08-24T23:13:09.325025Z",
+      "release_api_url": "https://splunkbase.splunk.com/api/v1/app/5543/release/39251/",
+      "release_api_crosscheck": "matched",
+      "enterprise_advertised": true,
+      "cloud_advertised": true,
+      "platform_versions": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1"
+      ],
+      "newer_parallel_releases": [],
+      "registry_entry": null,
+      "relationships": [],
+      "inspected_packages": [],
+      "disposition": "Use-case scope: cisco-security-cloud-setup. Firepower/FTD API, eStreamer and syslog use cases exist; this CCX package is not an approved replacement. Exact package is unapproved; no automated install/configuration is claimed."
+    },
+    {
+      "splunkbase_id": "5558",
+      "listing_url": "https://splunkbase.splunk.com/app/5558/",
+      "title": "Cisco Secure Access App for Splunk",
+      "publisher": "Cisco Systems, Inc.",
+      "support": "cisco",
+      "package_type": "app",
+      "license": {
+        "canonicalName": "End User License Agreement for Third-Party Content",
+        "displayName": "End User License Agreement for Third-Party Content",
+        "url": "https://cdn.splunkbase.splunk.com/static/misc/eula.html"
+      },
+      "listing_default_version": "1.0.60",
+      "listing_default_date": "2026-10-21T12:42:17.158387Z",
+      "release_api_url": "https://splunkbase.splunk.com/api/v1/app/5558/release/124895/",
+      "release_api_crosscheck": "matched",
+      "enterprise_advertised": true,
+      "cloud_advertised": true,
+      "platform_versions": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4"
+      ],
+      "newer_parallel_releases": [],
+      "registry_entry": {
+        "skill": "cisco-secure-access-setup",
+        "app_name": "cisco-cloud-security",
+        "splunkbase_id": "5558",
+        "latest_verified_version": "1.0.60"
+      },
+      "relationships": [
+        {
+          "product": "Splunkbase 7569",
+          "related_splunkbase_id": "7569",
+          "relationship": "event collection companion",
+          "use_case_skill": "cisco-secure-access-setup",
+          "source": "dated package review; not an inferred install_requires dependency"
+        },
+        {
+          "product": "Cisco Secure Access (SSE)",
+          "relationship": "app_viz_uid",
+          "use_case_skill": "cisco-secure-access-setup"
+        },
+        {
+          "product": "Cisco Cloudlock Cloud Access Security Broker (CASB)",
+          "relationship": "app_viz_uid",
+          "use_case_skill": "cisco-secure-access-setup"
+        },
+        {
+          "product": "Cisco Umbrella",
+          "relationship": "app_viz_uid",
+          "use_case_skill": "cisco-secure-access-setup"
+        },
+        {
+          "product": "Cisco Umbrella Investigate",
+          "relationship": "app_viz_uid",
+          "use_case_skill": "cisco-secure-access-setup"
+        }
+      ],
+      "inspected_packages": [
+        {
+          "package_version": "1.0.60",
+          "binary_sha256": "45c6e683f41659552f70f3d49692d67b978a71b362a6ed9374d805a71052d803",
+          "evidence_reports": [
+            "cisco-package-review-security-2026-11-16.md"
+          ]
+        }
+      ],
+      "disposition": "Exact registry workflow. Complete ingest/dashboard gates; retain documented holds when selected pin differs from default."
+    },
+    {
+      "splunkbase_id": "5580",
+      "listing_url": "https://splunkbase.splunk.com/app/5580/",
+      "title": "Cisco Meraki Add-on for Splunk",
+      "publisher": "Cisco Systems, Inc.",
+      "support": "cisco",
+      "package_type": "addon",
+      "license": {
+        "canonicalName": "Cisco End User License",
+        "displayName": "Cisco End User License",
+        "url": "https://www.cisco.com/c/dam/en_us/about/doing_business/docs/test/EULA_EN.pdf"
+      },
+      "listing_default_version": "3.5.0",
+      "listing_default_date": "2026-09-24T16:56:43.399657Z",
+      "release_api_url": "https://splunkbase.splunk.com/api/v1/app/5580/release/124387/",
+      "release_api_crosscheck": "matched",
+      "enterprise_advertised": true,
+      "cloud_advertised": true,
+      "platform_versions": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2"
+      ],
+      "newer_parallel_releases": [],
+      "registry_entry": {
+        "skill": "cisco-meraki-ta-setup",
+        "app_name": "Splunk_TA_cisco_meraki",
+        "splunkbase_id": "5580",
+        "latest_verified_version": "3.5.0"
+      },
+      "relationships": [
+        {
+          "product": "Cisco Meraki",
+          "relationship": "addon_uid",
+          "use_case_skill": "cisco-meraki-ta-setup"
+        }
+      ],
+      "inspected_packages": [
+        {
+          "package_version": "3.5.0",
+          "binary_sha256": "edd12274203a367e73c8f3ae2115ad18008b6f20f46614602b724fc7758ac8e8",
+          "evidence_reports": [
+            "cisco-package-review-security-2026-11-16.md"
+          ]
+        }
+      ],
+      "disposition": "Exact registry workflow. Complete ingest/dashboard gates; retain documented holds when selected pin differs from default."
+    },
+    {
+      "splunkbase_id": "5743",
+      "listing_url": "https://splunkbase.splunk.com/app/5743/",
+      "title": "Cisco Suite for Splunk",
+      "publisher": "Prewin Thomas",
+      "support": "not_supported",
+      "package_type": "app",
+      "license": {
+        "canonicalName": "End User License Agreement for Third-Party Content",
+        "displayName": "End User License Agreement for Third-Party Content",
+        "url": "https://cdn.splunkbase.splunk.com/static/misc/eula.html"
+      },
+      "listing_default_version": "1.2.0",
+      "listing_default_date": "2026-11-02T19:27:05.610148Z",
+      "release_api_url": "https://splunkbase.splunk.com/api/v1/app/5743/release/125176/",
+      "release_api_crosscheck": "matched",
+      "enterprise_advertised": true,
+      "cloud_advertised": true,
+      "platform_versions": [
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "newer_parallel_releases": [],
+      "registry_entry": null,
+      "relationships": [],
+      "inspected_packages": [],
+      "disposition": "Use-case scope: cisco-product-setup. The product router covers multiple Cisco families; this separate suite has no reviewed multi-package deployment or dashboard contract. Exact package is unapproved; no automated install/configuration is claimed."
+    },
+    {
+      "splunkbase_id": "5746",
+      "listing_url": "https://splunkbase.splunk.com/app/5746/",
+      "title": "JDS AppDynamics Ingester",
+      "publisher": "AUSTRALIAN CENTRE FOR ADVANCED COMPUTING AND COMMUNICATION PTY LTD",
+      "support": "developer",
+      "package_type": "addon",
+      "license": {
+        "canonicalName": "License and EULA to be agreed at time of purchase.",
+        "displayName": "License and EULA to be agreed at time of purchase.",
+        "url": "https://www.jds.net.au/contact-us/"
+      },
+      "listing_default_version": "0.0.12",
+      "listing_default_date": "2026-05-01T06:12:31.263203Z",
+      "release_api_url": "https://splunkbase.splunk.com/api/v1/app/5746/release/42695/",
+      "release_api_crosscheck": "matched",
+      "enterprise_advertised": true,
+      "cloud_advertised": false,
+      "platform_versions": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "newer_parallel_releases": [],
+      "registry_entry": null,
+      "relationships": [],
+      "inspected_packages": [],
+      "disposition": "Use-case scope: cisco-appdynamics-setup. Controller/Analytics collection overlaps; JDS input and index contracts require separate review. Exact package is unapproved; no automated install/configuration is claimed."
+    },
+    {
+      "splunkbase_id": "5747",
+      "listing_url": "https://splunkbase.splunk.com/app/5747/",
+      "title": "Cisco Cyber Vision Splunk App",
+      "publisher": "Cyber Vision",
+      "support": "developer",
+      "package_type": "app",
+      "license": {
+        "canonicalName": "End User License Agreement for Third-Party Content",
+        "displayName": "End User License Agreement for Third-Party Content",
+        "url": "https://cdn.splunkbase.splunk.com/static/misc/eula.html"
+      },
+      "listing_default_version": "2.2.2",
+      "listing_default_date": "2026-10-06T07:16:12.250981Z",
+      "release_api_url": "https://splunkbase.splunk.com/api/v1/app/5747/release/124570/",
+      "release_api_crosscheck": "matched",
+      "enterprise_advertised": true,
+      "cloud_advertised": true,
+      "platform_versions": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4"
+      ],
+      "newer_parallel_releases": [],
+      "registry_entry": null,
+      "relationships": [
+        {
+          "product": "Splunkbase 5748",
+          "related_splunkbase_id": "5748",
+          "relationship": "Cyber Vision collection companion; platform range stops at 10.4",
+          "use_case_skill": null,
+          "source": "dated package review; not an inferred install_requires dependency"
+        }
+      ],
+      "inspected_packages": [
+        {
+          "package_version": "2.2.2",
+          "binary_sha256": "0ab98df8414076436ee7087f7aba4507e65fe85f0d344ab68bee711892cd6c8d",
+          "evidence_reports": [
+            "cisco-package-review-security-2026-11-16.md"
+          ]
+        }
+      ],
+      "disposition": "Cisco-authored Cyber Vision, developer support. Separate add-on/app pair; add-on compatibility stops at 10.4. Existing Catalyst flow has a different package contract."
+    },
+    {
+      "splunkbase_id": "5748",
+      "listing_url": "https://splunkbase.splunk.com/app/5748/",
+      "title": "Cisco Cyber Vision Splunk Add On",
+      "publisher": "Cyber Vision",
+      "support": "developer",
+      "package_type": "addon",
+      "license": {
+        "canonicalName": "End User License Agreement for Third-Party Content",
+        "displayName": "End User License Agreement for Third-Party Content",
+        "url": "https://cdn.splunkbase.splunk.com/static/misc/eula.html"
+      },
+      "listing_default_version": "2.2.2",
+      "listing_default_date": "2026-08-31T11:05:22.171964Z",
+      "release_api_url": "https://splunkbase.splunk.com/api/v1/app/5748/release/123863/",
+      "release_api_crosscheck": "matched",
+      "enterprise_advertised": true,
+      "cloud_advertised": true,
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "newer_parallel_releases": [],
+      "registry_entry": null,
+      "relationships": [
+        {
+          "product": "Splunkbase 5747",
+          "related_splunkbase_id": "5747",
+          "relationship": "Cyber Vision visualization companion",
+          "use_case_skill": null,
+          "source": "dated package review; not an inferred install_requires dependency"
+        }
+      ],
+      "inspected_packages": [
+        {
+          "package_version": "2.2.2",
+          "binary_sha256": "fefa28669835e2eaf76f85352a5e4cbb47767d0bff516eb98ce42744da28a5bd",
+          "evidence_reports": [
+            "cisco-package-review-security-2026-11-16.md"
+          ]
+        }
+      ],
+      "disposition": "Cisco-authored Cyber Vision, developer support. Separate add-on/app pair; add-on compatibility stops at 10.4. Existing Catalyst flow has a different package contract."
+    },
+    {
+      "splunkbase_id": "6398",
+      "listing_url": "https://splunkbase.splunk.com/app/6398/",
+      "title": "Cisco Secure Network Analytics (Stealthwatch) App for Splunk Enterprise",
+      "publisher": "Cisco Systems",
+      "support": "not_supported",
+      "package_type": "app",
+      "license": {
+        "canonicalName": "customer",
+        "displayName": "Customer License Agreement for App",
+        "url": "http://www.cisco.com/go/eula"
+      },
+      "listing_default_version": "2.1.0",
+      "listing_default_date": "2026-07-10T15:11:17.254389Z",
+      "release_api_url": "https://splunkbase.splunk.com/api/v1/app/6398/release/122348/",
+      "release_api_crosscheck": "matched",
+      "enterprise_advertised": true,
+      "cloud_advertised": true,
+      "platform_versions": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "newer_parallel_releases": [],
+      "registry_entry": null,
+      "relationships": [],
+      "inspected_packages": [],
+      "disposition": "Use-case scope: cisco-security-cloud-setup. Secure Network Analytics collection exists; this separate visualization app needs sourcetype/macro and licensing qualification. Exact package is unapproved; no automated install/configuration is claimed."
+    },
+    {
+      "splunkbase_id": "6460",
+      "listing_url": "https://splunkbase.splunk.com/app/6460/",
+      "title": "CCX Add-on for Cisco Identity Services (ISE)",
+      "publisher": "Henrique Linsmeyer",
+      "support": "developer",
+      "package_type": "addon",
+      "license": {
+        "canonicalName": "customer",
+        "displayName": "Customer License Agreement for App",
+        "url": "http://www.cybercx.com.au"
+      },
+      "listing_default_version": "1.0.4",
+      "listing_default_date": "2025-08-24T23:47:49.751290Z",
+      "release_api_url": "https://splunkbase.splunk.com/api/v1/app/6460/release/39254/",
+      "release_api_crosscheck": "matched",
+      "enterprise_advertised": true,
+      "cloud_advertised": true,
+      "platform_versions": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1"
+      ],
+      "newer_parallel_releases": [],
+      "registry_entry": null,
+      "relationships": [],
+      "inspected_packages": [],
+      "disposition": "Use-case scope: cisco-catalyst-ta-setup. ISE API/syslog use cases are covered through another package; CCX parser and input equivalence is unverified. Exact package is unapproved; no automated install/configuration is claimed."
+    },
+    {
+      "splunkbase_id": "6481",
+      "listing_url": "https://splunkbase.splunk.com/app/6481/",
+      "title": "CCX Add-on for Cisco Secure Endpoint (AMP)",
+      "publisher": "Henrique Linsmeyer",
+      "support": "developer",
+      "package_type": "addon",
+      "license": {
+        "canonicalName": "customer",
+        "displayName": "Customer License Agreement for App",
+        "url": "http://www.cybercx.com.au"
+      },
+      "listing_default_version": "1.0.4",
+      "listing_default_date": "2025-08-24T11:52:10.743713Z",
+      "release_api_url": "https://splunkbase.splunk.com/api/v1/app/6481/release/39239/",
+      "release_api_crosscheck": "matched",
+      "enterprise_advertised": true,
+      "cloud_advertised": true,
+      "platform_versions": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1"
+      ],
+      "newer_parallel_releases": [],
+      "registry_entry": null,
+      "relationships": [],
+      "inspected_packages": [],
+      "disposition": "Use-case scope: cisco-security-cloud-setup. Secure Endpoint API collection exists; this CCX package is not configured by that workflow. Exact package is unapproved; no automated install/configuration is claimed."
+    },
+    {
+      "splunkbase_id": "6544",
+      "listing_url": "https://splunkbase.splunk.com/app/6544/",
+      "title": "CCX Duo Connector and Cisco Security Support",
+      "publisher": "Henrique Linsmeyer",
+      "support": "developer",
+      "package_type": "addon",
+      "license": {
+        "canonicalName": "customer",
+        "displayName": "Customer License Agreement for App",
+        "url": "http://www.cybercx.com.au"
+      },
+      "listing_default_version": "2.0.0",
+      "listing_default_date": "2025-08-20T00:56:47.508868Z",
+      "release_api_url": "https://splunkbase.splunk.com/api/v1/app/6544/release/39163/",
+      "release_api_crosscheck": "matched",
+      "enterprise_advertised": true,
+      "cloud_advertised": true,
+      "platform_versions": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1"
+      ],
+      "newer_parallel_releases": [],
+      "registry_entry": null,
+      "relationships": [],
+      "inspected_packages": [],
+      "disposition": "Use-case scope: cisco-security-cloud-setup. Duo collection exists; this CCX connector and its support/licensing remain separate. Exact package is unapproved; no automated install/configuration is claimed."
+    },
+    {
+      "splunkbase_id": "6872",
+      "listing_url": "https://splunkbase.splunk.com/app/6872/",
+      "title": "Cisco Enterprise Networking NetFlow Add-on for Splunk",
+      "publisher": "Cisco Systems, Inc.",
+      "support": "cisco",
+      "package_type": "addon",
+      "license": {
+        "canonicalName": "ceul",
+        "displayName": "Cisco End User License",
+        "url": "https://www.cisco.com/c/dam/en_us/about/doing_business/docs/test/EULA_EN.pdf"
+      },
+      "listing_default_version": "4.0.0",
+      "listing_default_date": "2026-08-26T15:13:27.762675Z",
+      "release_api_url": "https://splunkbase.splunk.com/api/v1/app/6872/release/123784/",
+      "release_api_crosscheck": "matched",
+      "enterprise_advertised": true,
+      "cloud_advertised": true,
+      "platform_versions": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2"
+      ],
+      "newer_parallel_releases": [],
+      "registry_entry": {
+        "skill": "cisco-catalyst-enhanced-netflow-setup",
+        "app_name": "splunk_app_stream_ipfix_cisco_hsl",
+        "splunkbase_id": "6872",
+        "latest_verified_version": "2.1.0"
+      },
+      "relationships": [
+        {
+          "product": "Splunkbase 7538",
+          "related_splunkbase_id": "7538",
+          "relationship": "shared product guide and collection health",
+          "use_case_skill": "cisco-catalyst-enhanced-netflow-setup",
+          "source": "dated package review; not an inferred install_requires dependency"
+        },
+        {
+          "product": "Splunkbase 7539",
+          "related_splunkbase_id": "7539",
+          "relationship": "optional visualization consumer",
+          "use_case_skill": "cisco-catalyst-enhanced-netflow-setup",
+          "source": "dated package review; not an inferred install_requires dependency"
+        }
+      ],
+      "inspected_packages": [
+        {
+          "package_version": "4.0.0",
+          "binary_sha256": "94722579e0f120e0b5c93c9eac2873fb94f4749134b08652f578bb398803fc52",
+          "evidence_reports": [
+            "cisco-package-review-network-dc-2026-11-16.md"
+          ]
+        }
+      ],
+      "disposition": "Exact registry workflow. Complete ingest/dashboard gates; retain documented holds when selected pin differs from default."
+    },
+    {
+      "splunkbase_id": "7404",
+      "listing_url": "https://splunkbase.splunk.com/app/7404/",
+      "title": "Cisco Security Cloud",
+      "publisher": "Cisco Systems, Inc.",
+      "support": "cisco",
+      "package_type": "addon",
+      "license": {
+        "canonicalName": "3rd_party_eula_custom",
+        "displayName": "Third Party Developer EULA",
+        "url": "https://www.cisco.com/c/dam/en_us/about/doing_business/legal/Cisco_General_Terms.pdf"
+      },
+      "listing_default_version": "4.1.3",
+      "listing_default_date": "2026-10-26T12:08:34.972266Z",
+      "release_api_url": "https://splunkbase.splunk.com/api/v1/app/7404/release/124982/",
+      "release_api_crosscheck": "matched",
+      "enterprise_advertised": true,
+      "cloud_advertised": true,
+      "platform_versions": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1"
+      ],
+      "newer_parallel_releases": [],
+      "registry_entry": {
+        "skill": "cisco-security-cloud-setup",
+        "app_name": "CiscoSecurityCloud",
+        "splunkbase_id": "7404",
+        "latest_verified_version": "3.6.10"
+      },
+      "relationships": [
+        {
+          "product": "Cisco AI Defense",
+          "relationship": "addon_uid",
+          "use_case_skill": "cisco-security-cloud-setup"
+        },
+        {
+          "product": "Cisco Duo Security",
+          "relationship": "addon_uid",
+          "use_case_skill": "cisco-security-cloud-setup"
+        },
+        {
+          "product": "Cisco Email Threat Defense (ETD)",
+          "relationship": "addon_uid",
+          "use_case_skill": "cisco-security-cloud-setup"
+        },
+        {
+          "product": "Cisco Extended Detection and Response (XDR)",
+          "relationship": "addon_uid",
+          "use_case_skill": "cisco-security-cloud-setup"
+        },
+        {
+          "product": "Cisco Identity Intelligence (CII)",
+          "relationship": "addon_uid",
+          "use_case_skill": "cisco-security-cloud-setup"
+        },
+        {
+          "product": "Cisco Isovalent",
+          "relationship": "addon_uid",
+          "use_case_skill": "cisco-security-cloud-setup"
+        },
+        {
+          "product": "Cisco Isovalent Edge Processor (IEP)",
+          "relationship": "addon_uid",
+          "use_case_skill": "cisco-security-cloud-setup"
+        },
+        {
+          "product": "Cisco Multicloud Defense (MCD)",
+          "relationship": "addon_uid",
+          "use_case_skill": "cisco-security-cloud-setup"
+        },
+        {
+          "product": "Cisco Network Visibility Module (NVM)",
+          "relationship": "addon_uid",
+          "use_case_skill": "cisco-security-cloud-setup"
+        },
+        {
+          "product": "Cisco Secure Endpoint (CSE/AMP)",
+          "relationship": "addon_uid",
+          "use_case_skill": "cisco-security-cloud-setup"
+        },
+        {
+          "product": "Cisco Secure Firewall (FTD/eStreamer/ASA)",
+          "relationship": "addon_uid",
+          "use_case_skill": "cisco-security-cloud-setup"
+        },
+        {
+          "product": "Cisco Secure Malware Analytics (SMA)",
+          "relationship": "addon_uid",
+          "use_case_skill": "cisco-security-cloud-setup"
+        },
+        {
+          "product": "Cisco Secure Network Analytics (SNA)",
+          "relationship": "addon_uid",
+          "use_case_skill": "cisco-security-cloud-setup"
+        },
+        {
+          "product": "Cisco Secure Workload (CSW)",
+          "relationship": "addon_uid",
+          "use_case_skill": "cisco-security-cloud-setup"
+        },
+        {
+          "product": "Cisco Vulnerability Intelligence (CVI)",
+          "relationship": "addon_uid",
+          "use_case_skill": "cisco-security-cloud-setup"
+        },
+        {
+          "product": "Cisco Endpoint Visibility Module (EVM)",
+          "relationship": "addon_uid",
+          "use_case_skill": "splunk-app-install"
+        },
+        {
+          "product": "Cisco Secure Cloud Analytics (SCA)",
+          "relationship": "addon_uid",
+          "use_case_skill": "splunk-app-install"
+        }
+      ],
+      "inspected_packages": [
+        {
+          "package_version": "4.1.3",
+          "binary_sha256": "54345d6220e288942ec245a0cfa2f1f9433b4b9f9e82c1426f9c4689505104a6",
+          "evidence_reports": [
+            "cisco-package-review-security-2026-11-16.md"
+          ]
+        }
+      ],
+      "disposition": "Exact registry workflow. Complete ingest/dashboard gates; retain documented holds when selected pin differs from default."
+    },
+    {
+      "splunkbase_id": "7538",
+      "listing_url": "https://splunkbase.splunk.com/app/7538/",
+      "title": "Cisco Enterprise Networking Add-on for Splunk",
+      "publisher": "Cisco Systems, Inc.",
+      "support": "cisco",
+      "package_type": "addon",
+      "license": {
+        "canonicalName": "Cisco End User License",
+        "displayName": "Cisco End User License",
+        "url": "https://www.cisco.com/c/dam/en_us/about/doing_business/docs/test/EULA_EN.pdf"
+      },
+      "listing_default_version": "4.0.60",
+      "listing_default_date": "2026-10-20T20:29:47.039769Z",
+      "release_api_url": "https://splunkbase.splunk.com/api/v1/app/7538/release/124874/",
+      "release_api_crosscheck": "matched",
+      "enterprise_advertised": true,
+      "cloud_advertised": true,
+      "platform_versions": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2"
+      ],
+      "newer_parallel_releases": [],
+      "registry_entry": {
+        "skill": "cisco-catalyst-ta-setup",
+        "app_name": "TA_cisco_catalyst",
+        "splunkbase_id": "7538",
+        "latest_verified_version": "3.2.44"
+      },
+      "relationships": [
+        {
+          "product": "Splunkbase 7539",
+          "related_splunkbase_id": "7539",
+          "relationship": "visualization companion",
+          "use_case_skill": "cisco-catalyst-ta-setup",
+          "source": "dated package review; not an inferred install_requires dependency"
+        },
+        {
+          "product": "Splunkbase 6872",
+          "related_splunkbase_id": "6872",
+          "relationship": "optional NetFlow mapping companion",
+          "use_case_skill": "cisco-catalyst-ta-setup",
+          "source": "dated package review; not an inferred install_requires dependency"
+        },
+        {
+          "product": "Cisco Cyber Vision (CCV)",
+          "relationship": "addon_uid",
+          "use_case_skill": "cisco-catalyst-ta-setup"
+        },
+        {
+          "product": "Cisco Catalyst Center (DNAC)",
+          "relationship": "addon_uid",
+          "use_case_skill": "cisco-catalyst-ta-setup"
+        },
+        {
+          "product": "Cisco Identity Services Engine (ISE)",
+          "relationship": "addon_uid",
+          "use_case_skill": "cisco-catalyst-ta-setup"
+        },
+        {
+          "product": "Cisco Catalyst SD-WAN (vManage)",
+          "relationship": "addon_uid",
+          "use_case_skill": "cisco-catalyst-ta-setup"
+        },
+        {
+          "product": "Cisco Access Points (AP)",
+          "relationship": "addon_uid",
+          "use_case_skill": "cisco-catalyst-ta-setup"
+        },
+        {
+          "product": "Cisco Aggregation Services Routers (ASR)",
+          "relationship": "addon_uid",
+          "use_case_skill": "cisco-catalyst-ta-setup"
+        },
+        {
+          "product": "Cisco Carrier Routing System (CRS)",
+          "relationship": "addon_uid",
+          "use_case_skill": "cisco-catalyst-ta-setup"
+        },
+        {
+          "product": "Cisco Catalyst Switches (IOS)",
+          "relationship": "addon_uid",
+          "use_case_skill": "cisco-catalyst-ta-setup"
+        },
+        {
+          "product": "Cisco Integrated Services Routers (ISR)",
+          "relationship": "addon_uid",
+          "use_case_skill": "cisco-catalyst-ta-setup"
+        },
+        {
+          "product": "Cisco Wireless LAN Controller (WLC)",
+          "relationship": "addon_uid",
+          "use_case_skill": "cisco-catalyst-ta-setup"
+        }
+      ],
+      "inspected_packages": [
+        {
+          "package_version": "4.0.60",
+          "binary_sha256": "bbf2ace479e3fc9b15fbe5c8c30b212fdf474931a7b428f361219e6c19a1172d",
+          "evidence_reports": [
+            "cisco-package-review-network-dc-2026-11-16.md"
+          ]
+        }
+      ],
+      "disposition": "Exact registry workflow. Complete ingest/dashboard gates; retain documented holds when selected pin differs from default."
+    },
+    {
+      "splunkbase_id": "7539",
+      "listing_url": "https://splunkbase.splunk.com/app/7539/",
+      "title": "Cisco Enterprise Networking App for Splunk",
+      "publisher": "Cisco Systems, Inc.",
+      "support": "cisco",
+      "package_type": "app",
+      "license": {
+        "canonicalName": "Cisco End User License",
+        "displayName": "Cisco End User License",
+        "url": "https://www.cisco.com/c/dam/en_us/about/doing_business/docs/test/EULA_EN.pdf"
+      },
+      "listing_default_version": "4.0.20",
+      "listing_default_date": "2026-10-08T01:26:18.189588Z",
+      "release_api_url": "https://splunkbase.splunk.com/api/v1/app/7539/release/124609/",
+      "release_api_crosscheck": "matched",
+      "enterprise_advertised": true,
+      "cloud_advertised": true,
+      "platform_versions": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2"
+      ],
+      "newer_parallel_releases": [],
+      "registry_entry": {
+        "skill": "cisco-enterprise-networking-setup",
+        "app_name": "cisco-catalyst-app",
+        "splunkbase_id": "7539",
+        "latest_verified_version": "3.2.20",
+        "install_requires": [
+          "7538"
+        ]
+      },
+      "relationships": [
+        {
+          "product": "Splunkbase 7538",
+          "related_splunkbase_id": "7538",
+          "relationship": "required collection/normalization companion",
+          "use_case_skill": "cisco-enterprise-networking-setup",
+          "source": "dated package review; not an inferred install_requires dependency"
+        },
+        {
+          "product": "Splunkbase 6872",
+          "related_splunkbase_id": "6872",
+          "relationship": "optional NetFlow mapping companion",
+          "use_case_skill": "cisco-enterprise-networking-setup",
+          "source": "dated package review; not an inferred install_requires dependency"
+        },
+        {
+          "product": "Cisco ThousandEyes (TE)",
+          "relationship": "app_viz_uid",
+          "use_case_skill": "cisco-thousandeyes-setup"
+        },
+        {
+          "product": "Cisco Cyber Vision (CCV)",
+          "relationship": "app_viz_uid",
+          "use_case_skill": "cisco-catalyst-ta-setup"
+        },
+        {
+          "product": "Cisco Catalyst Center (DNAC)",
+          "relationship": "app_viz_uid",
+          "use_case_skill": "cisco-catalyst-ta-setup"
+        },
+        {
+          "product": "Cisco Identity Services Engine (ISE)",
+          "relationship": "app_viz_uid",
+          "use_case_skill": "cisco-catalyst-ta-setup"
+        },
+        {
+          "product": "Cisco Catalyst SD-WAN (vManage)",
+          "relationship": "app_viz_uid",
+          "use_case_skill": "cisco-catalyst-ta-setup"
+        },
+        {
+          "product": "Cisco Access Points (AP)",
+          "relationship": "app_viz_uid",
+          "use_case_skill": "cisco-catalyst-ta-setup"
+        },
+        {
+          "product": "Cisco Aggregation Services Routers (ASR)",
+          "relationship": "app_viz_uid",
+          "use_case_skill": "cisco-catalyst-ta-setup"
+        },
+        {
+          "product": "Cisco Carrier Routing System (CRS)",
+          "relationship": "app_viz_uid",
+          "use_case_skill": "cisco-catalyst-ta-setup"
+        },
+        {
+          "product": "Cisco Catalyst Switches (IOS)",
+          "relationship": "app_viz_uid",
+          "use_case_skill": "cisco-catalyst-ta-setup"
+        },
+        {
+          "product": "Cisco Integrated Services Routers (ISR)",
+          "relationship": "app_viz_uid",
+          "use_case_skill": "cisco-catalyst-ta-setup"
+        },
+        {
+          "product": "Cisco Wireless LAN Controller (WLC)",
+          "relationship": "app_viz_uid",
+          "use_case_skill": "cisco-catalyst-ta-setup"
+        }
+      ],
+      "inspected_packages": [
+        {
+          "package_version": "4.0.20",
+          "binary_sha256": "0d9a8d85a50a408f6cfd1044425dfea28c4b2cb94d3ab570c073b296f8cc0382",
+          "evidence_reports": [
+            "cisco-package-review-network-dc-2026-11-16.md"
+          ]
+        }
+      ],
+      "disposition": "Exact registry workflow. Complete ingest/dashboard gates; retain documented holds when selected pin differs from default."
+    },
+    {
+      "splunkbase_id": "7548",
+      "listing_url": "https://splunkbase.splunk.com/app/7548/",
+      "title": "Custom Alert that can hit directly Cisco ISE API to block mac-address",
+      "publisher": "WIMBO PRABA CANDRA SUCI",
+      "support": "not_supported",
+      "package_type": "addon",
+      "license": {
+        "canonicalName": "3rd_party_eula",
+        "displayName": "Splunk End User License for Third Party Content",
+        "url": "https://cdn.splunkbase.splunk.com/static/misc/eula.html"
+      },
+      "listing_default_version": "1.0.4",
+      "listing_default_date": "2025-10-06T12:24:52.710657Z",
+      "release_api_url": "https://splunkbase.splunk.com/api/v1/app/7548/release/39923/",
+      "release_api_crosscheck": "matched",
+      "enterprise_advertised": true,
+      "cloud_advertised": true,
+      "platform_versions": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "newer_parallel_releases": [],
+      "registry_entry": null,
+      "relationships": [],
+      "inspected_packages": [],
+      "disposition": "Use-case scope: cisco-catalyst-ta-setup. ISE telemetry collection exists; outbound MAC-blocking response is a distinct unowned mutation workflow. Exact package is unapproved; no automated install/configuration is claimed."
+    },
+    {
+      "splunkbase_id": "7557",
+      "listing_url": "https://splunkbase.splunk.com/app/7557/",
+      "title": "Cisco Talos Intelligence for Enterprise Security Cloud",
+      "publisher": "Splunk LLC",
+      "support": "splunk",
+      "package_type": "app",
+      "license": {
+        "canonicalName": "sgt",
+        "displayName": "Splunk General Terms",
+        "url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html"
+      },
+      "listing_default_version": "1.0.3",
+      "listing_default_date": "2026-06-18T13:51:54.554473Z",
+      "release_api_url": "https://splunkbase.splunk.com/api/v1/app/7557/release/121983/",
+      "release_api_crosscheck": "matched",
+      "enterprise_advertised": true,
+      "cloud_advertised": true,
+      "platform_versions": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0"
+      ],
+      "newer_parallel_releases": [],
+      "registry_entry": {
+        "skill": "cisco-talos-intelligence-setup",
+        "app_name": "Splunk_TA_Talos_Intelligence",
+        "splunkbase_id": "7557",
+        "latest_verified_version": "1.0.3"
+      },
+      "relationships": [
+        {
+          "product": "Cisco Talos",
+          "relationship": "addon_uid",
+          "use_case_skill": "cisco-talos-intelligence-setup"
+        }
+      ],
+      "inspected_packages": [
+        {
+          "package_version": "1.0.3",
+          "binary_sha256": "da519b725dc5c4041835946cad0476790bafaf0066125297d66668396af5c180",
+          "evidence_reports": [
+            "cisco-package-review-security-2026-11-16.md"
+          ]
+        }
+      ],
+      "disposition": "Exact registry workflow. Complete ingest/dashboard gates; retain documented holds when selected pin differs from default."
+    },
+    {
+      "splunkbase_id": "7569",
+      "listing_url": "https://splunkbase.splunk.com/app/7569/",
+      "title": "Cisco Secure Access Add-on for Splunk",
+      "publisher": "Cisco Systems, Inc.",
+      "support": "cisco",
+      "package_type": "addon",
+      "license": {
+        "canonicalName": "3rd_party_eula",
+        "displayName": "Splunk End User License for Third Party Content",
+        "url": "https://cdn.splunkbase.splunk.com/static/misc/eula.html"
+      },
+      "listing_default_version": "1.0.57",
+      "listing_default_date": "2026-10-21T12:40:44.647920Z",
+      "release_api_url": "https://splunkbase.splunk.com/api/v1/app/7569/release/124894/",
+      "release_api_crosscheck": "matched",
+      "enterprise_advertised": true,
+      "cloud_advertised": true,
+      "platform_versions": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4"
+      ],
+      "newer_parallel_releases": [],
+      "registry_entry": {
+        "skill": "cisco-secure-access-setup",
+        "app_name": "TA-cisco-cloud-security-addon",
+        "splunkbase_id": "7569",
+        "latest_verified_version": "1.0.57"
+      },
+      "relationships": [
+        {
+          "product": "Splunkbase 5558",
+          "related_splunkbase_id": "5558",
+          "relationship": "visualization/settings companion",
+          "use_case_skill": "cisco-secure-access-setup",
+          "source": "dated package review; not an inferred install_requires dependency"
+        },
+        {
+          "product": "Cisco Secure Access (SSE)",
+          "relationship": "addon_uid",
+          "use_case_skill": "cisco-secure-access-setup"
+        },
+        {
+          "product": "Cisco Cloudlock Cloud Access Security Broker (CASB)",
+          "relationship": "addon_uid",
+          "use_case_skill": "cisco-secure-access-setup"
+        },
+        {
+          "product": "Cisco Umbrella",
+          "relationship": "addon_uid",
+          "use_case_skill": "cisco-secure-access-setup"
+        },
+        {
+          "product": "Cisco Umbrella Investigate",
+          "relationship": "addon_uid",
+          "use_case_skill": "cisco-secure-access-setup"
+        }
+      ],
+      "inspected_packages": [
+        {
+          "package_version": "1.0.57",
+          "binary_sha256": "1c7811dd49976f4a923321f3c02a0dfd04dca1411d66f4c846750f5dffdf13f9",
+          "evidence_reports": [
+            "cisco-package-review-security-2026-11-16.md"
+          ]
+        }
+      ],
+      "disposition": "Exact registry workflow. Complete ingest/dashboard gates; retain documented holds when selected pin differs from default."
+    },
+    {
+      "splunkbase_id": "7581",
+      "listing_url": "https://splunkbase.splunk.com/app/7581/",
+      "title": "Atlas ITSI Content Pack for Cisco DNA",
+      "publisher": "Presidio - Key Partner Acct",
+      "support": "developer",
+      "package_type": "app",
+      "license": {
+        "canonicalName": "apache2",
+        "displayName": "Apache License Version 2.0",
+        "url": "https://www.apache.org/licenses/LICENSE-2.0.html"
+      },
+      "listing_default_version": "1.0.0",
+      "listing_default_date": "2025-05-22T15:19:05.156630Z",
+      "release_api_url": "https://splunkbase.splunk.com/api/v1/app/7581/release/37955/",
+      "release_api_crosscheck": "matched",
+      "enterprise_advertised": true,
+      "cloud_advertised": true,
+      "platform_versions": [
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1"
+      ],
+      "newer_parallel_releases": [],
+      "registry_entry": null,
+      "relationships": [],
+      "inspected_packages": [],
+      "disposition": "Use-case scope: splunk-itsi-config. Catalyst telemetry and ITSI service/KPI modeling exist; Atlas content-pack import and model mapping need separate qualification. Exact package is unapproved; no automated install/configuration is claimed."
+    },
+    {
+      "splunkbase_id": "7719",
+      "listing_url": "https://splunkbase.splunk.com/app/7719/",
+      "title": "Cisco ThousandEyes App for Splunk",
+      "publisher": "Cisco Systems, Inc.",
+      "support": "cisco",
+      "package_type": "app",
+      "license": {
+        "canonicalName": "ceul",
+        "displayName": "Cisco End User License",
+        "url": "https://www.cisco.com/c/dam/en_us/about/doing_business/docs/test/EULA_EN.pdf"
+      },
+      "listing_default_version": "0.9.0",
+      "listing_default_date": "2026-08-24T07:34:23.014671Z",
+      "release_api_url": "https://splunkbase.splunk.com/api/v1/app/7719/release/123722/",
+      "release_api_crosscheck": "matched",
+      "enterprise_advertised": true,
+      "cloud_advertised": true,
+      "platform_versions": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1"
+      ],
+      "newer_parallel_releases": [],
+      "registry_entry": {
+        "skill": "cisco-thousandeyes-setup",
+        "app_name": "ta_cisco_thousandeyes",
+        "splunkbase_id": "7719",
+        "latest_verified_version": "0.9.0"
+      },
+      "relationships": [
+        {
+          "product": "Cisco ThousandEyes (TE)",
+          "relationship": "addon_uid",
+          "use_case_skill": "cisco-thousandeyes-setup"
+        }
+      ],
+      "inspected_packages": [
+        {
+          "package_version": "0.9.0",
+          "binary_sha256": "2206fe9a288060a0a8d4e780cbba8c56ecd1c18cf53c965b60b505c3524cf6af",
+          "evidence_reports": [
+            "cisco-package-review-security-2026-11-16.md"
+          ]
+        }
+      ],
+      "disposition": "Exact registry workflow. Complete ingest/dashboard gates; retain documented holds when selected pin differs from default."
+    },
+    {
+      "splunkbase_id": "7777",
+      "listing_url": "https://splunkbase.splunk.com/app/7777/",
+      "title": "Cisco DC Networking",
+      "publisher": "Cisco Systems, Inc.",
+      "support": "cisco",
+      "package_type": "app",
+      "license": {
+        "canonicalName": "ceul",
+        "displayName": "Cisco End User License",
+        "url": "https://www.cisco.com/c/dam/en_us/about/doing_business/docs/test/EULA_EN.pdf"
+      },
+      "listing_default_version": "2.0.0",
+      "listing_default_date": "2026-11-03T02:34:32.882182Z",
+      "release_api_url": "https://splunkbase.splunk.com/api/v1/app/7777/release/125186/",
+      "release_api_crosscheck": "matched",
+      "enterprise_advertised": true,
+      "cloud_advertised": true,
+      "platform_versions": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4"
+      ],
+      "newer_parallel_releases": [],
+      "registry_entry": {
+        "skill": "cisco-dc-networking-setup",
+        "app_name": "cisco_dc_networking_app_for_splunk",
+        "splunkbase_id": "7777",
+        "latest_verified_version": "1.2.2"
+      },
+      "relationships": [
+        {
+          "product": "Cisco Nexus Switches",
+          "relationship": "addon_uid",
+          "use_case_skill": "cisco-dc-networking-setup"
+        },
+        {
+          "product": "Cisco ACI",
+          "relationship": "addon_uid",
+          "use_case_skill": "cisco-dc-networking-setup"
+        },
+        {
+          "product": "Cisco Nexus Dashboard (ND)",
+          "relationship": "addon_uid",
+          "use_case_skill": "cisco-dc-networking-setup"
+        }
+      ],
+      "inspected_packages": [
+        {
+          "package_version": "2.0.0",
+          "binary_sha256": "297cab257d5b608e2f9aee987eea3f2041b8944c93e2bc5e6a57fd1371fc09a9",
+          "evidence_reports": [
+            "cisco-package-review-network-dc-2026-11-16.md"
+          ]
+        }
+      ],
+      "disposition": "Exact registry workflow. Complete ingest/dashboard gates; retain documented holds when selected pin differs from default."
+    },
+    {
+      "splunkbase_id": "7828",
+      "listing_url": "https://splunkbase.splunk.com/app/7828/",
+      "title": "Cisco Intersight Add-on for Splunk",
+      "publisher": "Cisco Systems, Inc.",
+      "support": "cisco",
+      "package_type": "addon",
+      "license": {
+        "canonicalName": "ceul",
+        "displayName": "Cisco End User License",
+        "url": "https://www.cisco.com/c/dam/en_us/about/doing_business/docs/test/EULA_EN.pdf"
+      },
+      "listing_default_version": "3.2.2",
+      "listing_default_date": "2026-09-23T03:06:51.378757Z",
+      "release_api_url": "https://splunkbase.splunk.com/api/v1/app/7828/release/124359/",
+      "release_api_crosscheck": "matched",
+      "enterprise_advertised": true,
+      "cloud_advertised": true,
+      "platform_versions": [
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "newer_parallel_releases": [
+        {
+          "version": "3.3.1",
+          "published": "2026-11-16T09:08:48.436412Z"
+        }
+      ],
+      "registry_entry": {
+        "skill": "cisco-intersight-setup",
+        "app_name": "Splunk_TA_Cisco_Intersight",
+        "splunkbase_id": "7828",
+        "latest_verified_version": "3.1.1"
+      },
+      "relationships": [
+        {
+          "product": "Cisco Intersight",
+          "relationship": "addon_uid",
+          "use_case_skill": "cisco-intersight-setup"
+        }
+      ],
+      "inspected_packages": [
+        {
+          "package_version": "3.2.2",
+          "binary_sha256": "5046084bbe9d0ce76dcdd442e1b231f9f0a86cc5aef5bb3536d0e73b2c333a5f",
+          "evidence_reports": [
+            "cisco-package-review-network-dc-2026-11-16.md"
+          ]
+        },
+        {
+          "package_version": "3.3.1",
+          "binary_sha256": "e09739a0aae624b8fc7563badf35f67e8dfa3de171df5c35634e9ee0228b7e12",
+          "evidence_reports": [
+            "cisco-package-review-network-dc-2026-11-16.md"
+          ]
+        }
+      ],
+      "disposition": "Exact registry workflow. Complete ingest/dashboard gates; retain documented holds when selected pin differs from default."
+    },
+    {
+      "splunkbase_id": "8358",
+      "listing_url": "https://splunkbase.splunk.com/app/8358/",
+      "title": "Webex Alert Action",
+      "publisher": "alexandre argeris",
+      "support": "not_supported",
+      "package_type": "app",
+      "license": {
+        "canonicalName": "Apache License Version 2.0",
+        "displayName": "Apache License Version 2.0",
+        "url": "https://www.apache.org/licenses/LICENSE-2.0.html"
+      },
+      "listing_default_version": "2.0.0",
+      "listing_default_date": "2026-11-05T17:18:29.031328Z",
+      "release_api_url": "https://splunkbase.splunk.com/api/v1/app/8358/release/125298/",
+      "release_api_crosscheck": "matched",
+      "enterprise_advertised": true,
+      "cloud_advertised": true,
+      "platform_versions": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0"
+      ],
+      "newer_parallel_releases": [],
+      "registry_entry": null,
+      "relationships": [],
+      "inspected_packages": [],
+      "disposition": "Use-case scope: cisco-webex-setup. Webex event collection exists; sending alert-action messages is a distinct unowned outbound integration. Exact package is unapproved; no automated install/configuration is claimed."
+    },
+    {
+      "splunkbase_id": "8365",
+      "listing_url": "https://splunkbase.splunk.com/app/8365/",
+      "title": "Webex Add-on for Splunk",
+      "publisher": "Splunk Field Solutions",
+      "support": "developer",
+      "package_type": "addon",
+      "license": {
+        "canonicalName": "Apache License Version 2.0",
+        "displayName": "Apache License Version 2.0",
+        "url": "https://www.apache.org/licenses/LICENSE-2.0.html"
+      },
+      "listing_default_version": "1.4.3",
+      "listing_default_date": "2026-07-15T20:20:36.199538Z",
+      "release_api_url": "https://splunkbase.splunk.com/api/v1/app/8365/release/122440/",
+      "release_api_crosscheck": "matched",
+      "enterprise_advertised": true,
+      "cloud_advertised": false,
+      "platform_versions": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "newer_parallel_releases": [],
+      "registry_entry": {
+        "skill": "cisco-webex-setup",
+        "app_name": "ta_cisco_webex_add_on_for_splunk",
+        "splunkbase_id": "8365",
+        "latest_verified_version": "1.4.3"
+      },
+      "relationships": [
+        {
+          "product": "Splunkbase 4992",
+          "related_splunkbase_id": "4992",
+          "relationship": "visualization companion",
+          "use_case_skill": "cisco-webex-setup",
+          "source": "dated package review; not an inferred install_requires dependency"
+        },
+        {
+          "product": "Cisco Webex",
+          "relationship": "addon_uid",
+          "use_case_skill": "cisco-webex-setup"
+        }
+      ],
+      "inspected_packages": [
+        {
+          "package_version": "1.4.3",
+          "binary_sha256": "08dc03e3d0422935e0e0e0d985eafca558198d24ff74fe8194d525edc2baed35",
+          "evidence_reports": [
+            "cisco-package-review-security-2026-11-16.md"
+          ]
+        }
+      ],
+      "disposition": "Exact registry workflow. Complete ingest/dashboard gates; retain documented holds when selected pin differs from default."
+    },
+    {
+      "splunkbase_id": "8413",
+      "listing_url": "https://splunkbase.splunk.com/app/8413/",
+      "title": "Supporting App for Cisco Meeting Server",
+      "publisher": "Sideview, LLC - Partner",
+      "support": "developer",
+      "package_type": "app",
+      "license": {
+        "canonicalName": "Partner License Agreement for App",
+        "displayName": "Partner License Agreement for App",
+        "url": "https://sideviewapps.com/sideview-trial-internal-use-license-agreement/"
+      },
+      "listing_default_version": "0.6.3",
+      "listing_default_date": "2026-11-04T22:40:34.779287Z",
+      "release_api_url": "https://splunkbase.splunk.com/api/v1/app/8413/release/125235/",
+      "release_api_crosscheck": "matched",
+      "enterprise_advertised": true,
+      "cloud_advertised": true,
+      "platform_versions": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "newer_parallel_releases": [],
+      "registry_entry": null,
+      "relationships": [],
+      "inspected_packages": [],
+      "disposition": "Sideview third-party package: cisco-collaboration-setup offers evidence-only selection; exact version, tier, license and receiver gates apply."
+    },
+    {
+      "splunkbase_id": "8429",
+      "listing_url": "https://splunkbase.splunk.com/app/8429/",
+      "title": "Sideview Supporting App for Webex",
+      "publisher": "Sideview, LLC - Partner",
+      "support": "developer",
+      "package_type": "app",
+      "license": {
+        "canonicalName": "Third Party Developer EULA",
+        "displayName": "Third Party Developer EULA",
+        "url": "https://sideviewapps.com/sideview-trial-internal-use-license-agreement/"
+      },
+      "listing_default_version": "0.8.1",
+      "listing_default_date": "2026-11-14T00:09:39.291861Z",
+      "release_api_url": "https://splunkbase.splunk.com/api/v1/app/8429/release/125454/",
+      "release_api_crosscheck": "matched",
+      "enterprise_advertised": true,
+      "cloud_advertised": true,
+      "platform_versions": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "newer_parallel_releases": [],
+      "registry_entry": null,
+      "relationships": [],
+      "inspected_packages": [],
+      "disposition": "Use-case scope: cisco-webex-setup. Webex collection exists; this Sideview app is a separate entitlement/dependency contract, not automatically selected. Exact package is unapproved; no automated install/configuration is claimed."
+    },
+    {
+      "splunkbase_id": "8485",
+      "listing_url": "https://splunkbase.splunk.com/app/8485/",
+      "title": "Spaces Add-On for Splunk",
+      "publisher": "Cisco Systems, Inc.",
+      "support": "cisco",
+      "package_type": "addon",
+      "license": {
+        "canonicalName": "Cisco End User License",
+        "displayName": "Cisco End User License",
+        "url": "https://www.cisco.com/c/dam/en_us/about/doing_business/docs/test/EULA_EN.pdf"
+      },
+      "listing_default_version": "2.0.20",
+      "listing_default_date": "2026-09-21T20:23:19.427034Z",
+      "release_api_url": "https://splunkbase.splunk.com/api/v1/app/8485/release/124318/",
+      "release_api_crosscheck": "matched",
+      "enterprise_advertised": true,
+      "cloud_advertised": true,
+      "platform_versions": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2"
+      ],
+      "newer_parallel_releases": [],
+      "registry_entry": {
+        "skill": "cisco-spaces-setup",
+        "app_name": "ta_cisco_spaces",
+        "splunkbase_id": "8485",
+        "latest_verified_version": "2.0.20"
+      },
+      "relationships": [
+        {
+          "product": "Cisco Spaces",
+          "relationship": "addon_uid",
+          "use_case_skill": "cisco-spaces-setup"
+        }
+      ],
+      "inspected_packages": [
+        {
+          "package_version": "2.0.20",
+          "binary_sha256": "b98bb349568eeae3df9b27ccedbaca06374386b99dcfcb87e8a2f6456a7fd07e",
+          "evidence_reports": [
+            "cisco-package-review-security-2026-11-16.md"
+          ]
+        }
+      ],
+      "disposition": "Exact registry workflow. Complete ingest/dashboard gates; retain documented holds when selected pin differs from default."
+    },
+    {
+      "splunkbase_id": "8566",
+      "listing_url": "https://splunkbase.splunk.com/app/8566/",
+      "title": "Splunk Cisco App Navigator (SCAN)",
+      "publisher": "Splunk Field Solutions",
+      "support": "developer",
+      "package_type": "app",
+      "license": {
+        "canonicalName": "Apache License Version 2.0",
+        "displayName": "Apache License Version 2.0",
+        "url": "https://www.apache.org/licenses/LICENSE-2.0.html"
+      },
+      "listing_default_version": "1.0.50",
+      "listing_default_date": "2026-11-09T20:53:34.310466Z",
+      "release_api_url": "https://splunkbase.splunk.com/api/v1/app/8566/release/125363/",
+      "release_api_crosscheck": "matched",
+      "enterprise_advertised": true,
+      "cloud_advertised": true,
+      "platform_versions": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2"
+      ],
+      "newer_parallel_releases": [],
+      "registry_entry": {
+        "skill": "cisco-scan-setup",
+        "app_name": "splunk-cisco-app-navigator",
+        "splunkbase_id": "8566",
+        "latest_verified_version": "1.0.30"
+      },
+      "relationships": [],
+      "inspected_packages": [
+        {
+          "package_version": "1.0.50",
+          "binary_sha256": "8a1c7c007be05f097950384526393419422ebefbd7adcf32dd0939a79f782022",
+          "evidence_reports": [
+            "cisco-package-review-scan-2026-11-16.md"
+          ]
+        }
+      ],
+      "disposition": "Exact registry workflow. Complete ingest/dashboard gates; retain documented holds when selected pin differs from default."
+    },
+    {
+      "splunkbase_id": "8702",
+      "listing_url": "https://splunkbase.splunk.com/app/8702/",
+      "title": "Meraki CIM Compliance Add-on for Splunk",
+      "publisher": "Albert Martirosyan",
+      "support": "developer",
+      "package_type": "addon",
+      "license": {
+        "canonicalName": "Apache License Version 2.0",
+        "displayName": "Apache License Version 2.0",
+        "url": "https://www.apache.org/licenses/LICENSE-2.0.html"
+      },
+      "listing_default_version": "1.0.0",
+      "listing_default_date": "2026-05-01T05:35:20.350629Z",
+      "release_api_url": "https://splunkbase.splunk.com/api/v1/app/8702/release/42694/",
+      "release_api_crosscheck": "matched",
+      "enterprise_advertised": true,
+      "cloud_advertised": true,
+      "platform_versions": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "newer_parallel_releases": [],
+      "registry_entry": null,
+      "relationships": [],
+      "inspected_packages": [],
+      "disposition": "Use-case scope: cisco-meraki-ta-setup. Meraki collection and CIM readiness exist; this CIM overlay needs field/tag/model and parser-overlap review. Exact package is unapproved; no automated install/configuration is claimed."
+    },
+    {
+      "splunkbase_id": "9257",
+      "listing_url": "https://splunkbase.splunk.com/app/9257/",
+      "title": "Splunk Secure Networking Essentials",
+      "publisher": "Splunk Field Solutions",
+      "support": "developer",
+      "package_type": "app",
+      "license": {
+        "canonicalName": "Apache License Version 2.0",
+        "displayName": "Apache License Version 2.0",
+        "url": "https://www.apache.org/licenses/LICENSE-2.0.html"
+      },
+      "listing_default_version": "1.0.80",
+      "listing_default_date": "2026-11-03T02:56:02.823583Z",
+      "release_api_url": "https://splunkbase.splunk.com/api/v1/app/9257/release/125187/",
+      "release_api_crosscheck": "matched",
+      "enterprise_advertised": true,
+      "cloud_advertised": true,
+      "platform_versions": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2"
+      ],
+      "newer_parallel_releases": [],
+      "registry_entry": null,
+      "relationships": [],
+      "inspected_packages": [],
+      "disposition": "Use-case scope: splunk-app-install. Generic package handoff only. Secure Networking Essentials has no first-class ingest, dependency, dashboard or migration workflow here; its exact package remains uninspected. Exact package is unapproved; no automated install/configuration is claimed."
+    },
+    {
+      "splunkbase_id": "9433",
+      "listing_url": "https://splunkbase.splunk.com/app/9433/",
+      "title": "Supporting Add-on for Cisco CVP",
+      "publisher": "Sideview, LLC - Partner",
+      "support": "developer",
+      "package_type": "addon",
+      "license": {
+        "canonicalName": "Partner License Agreement for App",
+        "displayName": "Partner License Agreement for App",
+        "url": "https://sideviewapps.com/documentation/sideview-free-internal-use-license-agreement"
+      },
+      "listing_default_version": "0.6.0",
+      "listing_default_date": "2026-10-16T23:30:09.001217Z",
+      "release_api_url": "https://splunkbase.splunk.com/api/v1/app/9433/release/124791/",
+      "release_api_crosscheck": "matched",
+      "enterprise_advertised": true,
+      "cloud_advertised": true,
+      "platform_versions": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "newer_parallel_releases": [],
+      "registry_entry": null,
+      "relationships": [],
+      "inspected_packages": [],
+      "disposition": "Distinct package workflow gap: inspect package/collector, placement, license, ingest and dashboard contract before automation."
+    },
+    {
+      "splunkbase_id": "10065",
+      "listing_url": "https://splunkbase.splunk.com/app/10065/",
+      "title": "Sideview Supporting Add-on for Webex",
+      "publisher": "Sideview, LLC - Partner",
+      "support": "developer",
+      "package_type": "addon",
+      "license": {
+        "canonicalName": "Partner License Agreement for App",
+        "displayName": "Partner License Agreement for App",
+        "url": "https://sideviewapps.com/documentation/sideview-trial-internal-use-license-agreement"
+      },
+      "listing_default_version": "1.0.1",
+      "listing_default_date": "2026-11-14T00:06:56.036141Z",
+      "release_api_url": "https://splunkbase.splunk.com/api/v1/app/10065/release/125453/",
+      "release_api_crosscheck": "matched",
+      "enterprise_advertised": true,
+      "cloud_advertised": true,
+      "platform_versions": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "newer_parallel_releases": [],
+      "registry_entry": null,
+      "relationships": [],
+      "inspected_packages": [],
+      "disposition": "Use-case scope: cisco-webex-setup. Webex collection exists; this Sideview add-on is a separate entitlement/dependency contract, not automatically selected. Exact package is unapproved; no automated install/configuration is claimed."
+    },
+    {
+      "splunkbase_id": "10081",
+      "listing_url": "https://splunkbase.splunk.com/app/10081/",
+      "title": "eStreamer Add-on for Cisco Secure Firewall (FMC/Firepower)",
+      "publisher": "Nikhil Chawla",
+      "support": "developer",
+      "package_type": "addon",
+      "license": {
+        "canonicalName": "Apache License Version 2.0",
+        "displayName": "Apache License Version 2.0",
+        "url": "https://www.apache.org/licenses/LICENSE-2.0.html"
+      },
+      "listing_default_version": "2.2.2",
+      "listing_default_date": "2026-10-31T03:04:06.710899Z",
+      "release_api_url": "https://splunkbase.splunk.com/api/v1/app/10081/release/125128/",
+      "release_api_crosscheck": "matched",
+      "enterprise_advertised": true,
+      "cloud_advertised": true,
+      "platform_versions": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "newer_parallel_releases": [],
+      "registry_entry": null,
+      "relationships": [],
+      "inspected_packages": [],
+      "disposition": "Use-case scope: cisco-security-cloud-setup. FMC/eStreamer collection exists; the separately published receiver/parser is not automatically substituted. Exact package is unapproved; no automated install/configuration is claimed."
+    },
+    {
+      "splunkbase_id": "10276",
+      "listing_url": "https://splunkbase.splunk.com/app/10276/",
+      "title": "Secure Endpoint (AMP) Events and Audit Logs Add-on for Cisco",
+      "publisher": "Nikhil Chawla",
+      "support": "developer",
+      "package_type": "addon",
+      "license": {
+        "canonicalName": "Apache License Version 2.0",
+        "displayName": "Apache License Version 2.0",
+        "url": "https://www.apache.org/licenses/LICENSE-2.0.html"
+      },
+      "listing_default_version": "1.0.0",
+      "listing_default_date": "2026-11-03T23:15:20.208483Z",
+      "release_api_url": "https://splunkbase.splunk.com/api/v1/app/10276/release/125213/",
+      "release_api_crosscheck": "matched",
+      "enterprise_advertised": true,
+      "cloud_advertised": true,
+      "platform_versions": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "newer_parallel_releases": [],
+      "registry_entry": null,
+      "relationships": [],
+      "inspected_packages": [],
+      "disposition": "Use-case scope: cisco-security-cloud-setup. Secure Endpoint events overlap; this package's audit-log coverage and credentials need independent qualification. Exact package is unapproved; no automated install/configuration is claimed."
+    },
+    {
+      "splunkbase_id": "10286",
+      "listing_url": "https://splunkbase.splunk.com/app/10286/",
+      "title": "FTD and ASA Syslog Field Extractions Add-on for Cisco Secure Firewall",
+      "publisher": "Nikhil Chawla",
+      "support": "developer",
+      "package_type": "addon",
+      "license": {
+        "canonicalName": "Apache License Version 2.0",
+        "displayName": "Apache License Version 2.0",
+        "url": "https://www.apache.org/licenses/LICENSE-2.0.html"
+      },
+      "listing_default_version": "1.0.0",
+      "listing_default_date": "2026-11-05T02:51:06.280945Z",
+      "release_api_url": "https://splunkbase.splunk.com/api/v1/app/10286/release/125238/",
+      "release_api_crosscheck": "matched",
+      "enterprise_advertised": true,
+      "cloud_advertised": true,
+      "platform_versions": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "newer_parallel_releases": [],
+      "registry_entry": null,
+      "relationships": [],
+      "inspected_packages": [],
+      "disposition": "Use-case scope: cisco-asa-ta-setup. ASA/FTD syslog parsing exists, with a separate Security Cloud route; do not co-enable overlapping field-extraction packages without precedence review. Exact package is unapproved; no automated install/configuration is claimed."
+    },
+    {
+      "splunkbase_id": "10306",
+      "listing_url": "https://splunkbase.splunk.com/app/10306/",
+      "title": "FMC Syslog and Audit Log Add-on for Cisco Secure Firewall",
+      "publisher": "Nikhil Chawla",
+      "support": "developer",
+      "package_type": "addon",
+      "license": {
+        "canonicalName": "Apache License Version 2.0",
+        "displayName": "Apache License Version 2.0",
+        "url": "https://www.apache.org/licenses/LICENSE-2.0.html"
+      },
+      "listing_default_version": "1.0.0",
+      "listing_default_date": "2026-11-05T21:59:46.282277Z",
+      "release_api_url": "https://splunkbase.splunk.com/api/v1/app/10306/release/125305/",
+      "release_api_crosscheck": "matched",
+      "enterprise_advertised": true,
+      "cloud_advertised": true,
+      "platform_versions": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "newer_parallel_releases": [],
+      "registry_entry": null,
+      "relationships": [],
+      "inspected_packages": [],
+      "disposition": "Use-case scope: cisco-security-cloud-setup. FMC/FTD API and syslog paths are adjacent; this exact FMC audit/syslog parsing contract is not configured by the existing workflow. Exact package is unapproved; no automated install/configuration is claimed."
+    }
+  ],
+  "explicit_product_collisions": {
+    "5357": "uberAgent ESA is not Cisco ESA",
+    "6590": "uberAgent ESA companion is not Cisco ESA",
+    "6808": "ESET endpoint security is not Cisco Secure Endpoint"
+  }
+}

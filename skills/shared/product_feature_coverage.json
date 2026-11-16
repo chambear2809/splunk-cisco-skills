@@ -49,7 +49,7 @@
       ],
       "feature_count": 86,
       "feature_ids_sha256": "505daf0592c0d825caa4b80a4abfadc1e5718f263ae7dc4bcadb49538c863dea",
-      "feature_contracts_sha256": "9b7a1944de6d427a8fcab437455156275a30acad95b48051aef3d4bb8b31207e",
+      "feature_contracts_sha256": "4a34158e4c7f93c0fb48d05c507e08f6b92b3f778944b4214a2c3b91946fe12b",
       "require_row_boundary_statuses": [
         "no_plans_available",
         "partial",

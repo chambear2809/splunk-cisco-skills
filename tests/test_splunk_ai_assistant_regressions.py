@@ -28,7 +28,7 @@ class SplunkAIAssistantRegressionTests(ShellScriptRegressionBase):
         # 2.2.0 was downloaded, unpacked, and inspected. The public release has since
         # advanced, so retain the verified pin until the newer package is reviewed.
         self.assertEqual(app["latest_verified_version"], "2.2.0")
-        self.assertEqual(app["latest_release_version"], "2.3.3")
+        self.assertEqual(app["latest_release_version"], "2.3.6")
         self.assertEqual(app["min_splunk_version"], "9.3")
         self.assertIn("formerly", skill_text)
         self.assertIn("Splunk AI Assistant for SPL", skill_text)

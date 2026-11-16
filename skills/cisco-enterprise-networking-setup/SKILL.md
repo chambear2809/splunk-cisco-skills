@@ -84,14 +84,21 @@ Automates the **Cisco Enterprise Networking for Splunk Platform**
 `splunk-app-install` with `--source splunkbase --app-id 7539`; the shared
 installer defaults to the repository-verified package. If Splunkbase is
 unavailable, fall back to the local package in `splunk-ta/`.
-The repo-verified `3.2.20` release is also the current public listing, advertises
+The repo-verified `3.2.20` release advertises
 `10.5`, and is Cloud-compatible, so the default install path works on a `10.5`
-stack with no review override. Do not downgrade below `3.2.20` on a `10.5`
+stack with no review override. Splunkbase lists `4.0.20` as the default as of
+November 16, 2026. Its package was downloaded and inspected: macro names and
+the broad sourcetype allow-list remain compatible, but `summariesonly` now
+allows old summaries and the app includes additional Studio views. Keep the
+reviewed `3.2.20` pin until paired TA/app acceleration and dashboard migration
+tests are complete. Do not downgrade below `3.2.20` on a `10.5`
 stack: `3.1.0`, `3.2.0`, and `3.2.10` do not advertise that train. The setup
 wrapper reads the actual installed version before any REST mutation and refuses
 an unverified selection unless `--accept-unsupported-platform` is backed by
 documented vendor approval for the exact package and stack; the override is not
-compatibility certification.
+compatibility certification. The guard applies on Enterprise 10.6 as well as
+Cloud 10.5 and checks that the companion TA is the reviewed `3.2.44` before
+changing dashboard macros or acceleration.
 The shared installer enforces the required Cisco Catalyst Add-on dependency and
 installs `TA_cisco_catalyst` (Splunkbase ID `7538`) first when it is missing,
 so the visualization app is not deployed by itself. The Cisco Catalyst

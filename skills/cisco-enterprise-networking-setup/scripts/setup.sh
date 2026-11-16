@@ -49,9 +49,8 @@ require_configuration_version_compatible() {
     local selected_version="${1:-}"
     local version_source="${2:-selected package}"
 
-    [[ "${TARGET_SPLUNK_VERSION}" == "10.5" ]] || return 0
     if [[ "${selected_version}" == "${VERIFIED_APP_VERSION}" ]]; then
-        log "Compatibility preflight passed: ${version_source} ${APP_NAME} (app ID ${APP_ID}) ${VERIFIED_APP_VERSION} is repo-verified for Splunk 10.5."
+        log "Compatibility preflight passed: ${version_source} ${APP_NAME} (app ID ${APP_ID}) ${VERIFIED_APP_VERSION} uses the repo-reviewed package contract."
         return 0
     fi
     if [[ "${ACCEPT_UNSUPPORTED_PLATFORM}" == "true" ]]; then
@@ -59,25 +58,22 @@ require_configuration_version_compatible() {
         return 0
     fi
 
-    log "ERROR: ${version_source} ${APP_NAME} ${selected_version:-unknown} is not the repo-verified Splunk 10.5 package (${VERIFIED_APP_VERSION})."
+    log "ERROR: ${version_source} ${APP_NAME} ${selected_version:-unknown} is not the repo-reviewed package contract (${VERIFIED_APP_VERSION})."
     log "Refusing configuration before any REST mutation. Pass --accept-unsupported-platform only with documented vendor approval for this exact package and stack."
     return 1
 }
 
 preflight_configuration_platform() {
     resolve_configuration_target_version || return 1
-    if [[ "${TARGET_SPLUNK_VERSION}" == "10.5" && -n "${APP_VERSION}" ]]; then
+    if [[ -n "${APP_VERSION}" ]]; then
         require_configuration_version_compatible "${APP_VERSION}" "selected"
         return $?
     fi
-    if [[ "${TARGET_SPLUNK_VERSION}" == "10.5" ]]; then
-        log "INFO: No --app-version supplied; the installed ${APP_NAME} version will be read and verified before any REST mutation."
-    fi
+    log "INFO: No --app-version supplied; the installed ${APP_NAME} version will be read and verified before any REST mutation."
 }
 
 verify_installed_package_before_mutation() {
     local installed_version
-    [[ "${TARGET_SPLUNK_VERSION}" == "10.5" ]] || return 0
     installed_version="$(rest_get_app_version "$SK" "$SPLUNK_URI" "$APP_NAME" 2>/dev/null || true)"
     require_configuration_version_compatible "${installed_version}" "installed"
 }
@@ -132,6 +128,13 @@ check_prereqs() {
     verify_installed_package_before_mutation || exit 1
     if ! rest_check_app "$SK" "$SPLUNK_URI" "${CATALYST_TA_APP}" 2>/dev/null; then
         log "ERROR: Cisco Catalyst Add-on (${CATALYST_TA_APP}) not found. Install it before configuring dashboard macros and the SD-WAN index eventtype."
+        exit 1
+    fi
+    local companion_version
+    companion_version="$(rest_get_app_version "$SK" "$SPLUNK_URI" "${CATALYST_TA_APP}" 2>/dev/null || true)"
+    if [[ "${companion_version}" != "3.2.44" && "${ACCEPT_UNSUPPORTED_PLATFORM}" != "true" ]]; then
+        log "ERROR: Companion ${CATALYST_TA_APP} ${companion_version:-unknown} is not the reviewed 3.2.44 pair for ${APP_NAME} ${VERIFIED_APP_VERSION}."
+        log "Refusing dashboard and acceleration mutations before paired-package migration review."
         exit 1
     fi
     if ! rest_check_app "$SK" "$SPLUNK_URI" "${ENHANCED_NETFLOW_TA_APP}" 2>/dev/null; then

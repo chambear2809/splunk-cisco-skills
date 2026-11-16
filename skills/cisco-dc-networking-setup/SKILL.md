@@ -87,14 +87,30 @@ Automates the **Cisco DC Networking App for Splunk** (`cisco_dc_networking_app_f
 
 ## Package Model
 
-**Pull from Splunkbase first (latest version), fall back to `splunk-ta/`.**
-Use `splunk-app-install` with `--source splunkbase --app-id 7777` to get the
-latest release. If Splunkbase is unavailable, fall back to the local package
-in `splunk-ta/`. This applies to both Splunk Cloud (ACS) and Splunk Enterprise.
+**Pull from Splunkbase first, fall back to `splunk-ta/`.** Use
+`splunk-app-install` with `--source splunkbase --app-id 7777`; the shared
+installer defaults to the repository-reviewed `1.2.2` release. If Splunkbase
+is unavailable, fall back to the local package in `splunk-ta/`. This applies
+to both Splunk Cloud (ACS) and Splunk Enterprise.
+
+[Splunkbase](https://splunkbase.splunk.com/app/7777) listed `2.0.0` as its
+default on November 16, 2026, with Splunk 10.5 and Cloud compatibility. The
+new 2.0.0 package was downloaded and inspected, but remains a Beta major
+upgrade and is not adopted as the default. It adds Nexus Hyperfabric and MDS/SAN
+content, ships 88 views, and introduces additional sourcetypes and migration helpers. Treat upgrades from
+the 1.x contract as a planned migration: preserve existing indexes and
+accounts, stage the app on a test search tier, and validate each enabled input
+and dashboard before cutover.
 
 After installation, use this skill to configure accounts, inputs, macros, and
 validation over search-tier REST. Any `splunk-ta/_unpacked/` tree is
 review-only.
+
+The 2.0 account/input specs add `cisco_nexus_hyperfabric` (bearer-token
+authentication) and `cisco_mds_san` datasets. This skill's current wrappers
+support only ACI, Nexus Dashboard, and Nexus 9K account/input types; Hyperfabric
+and MDS/SAN require a manual handoff and are not reported as configured by the
+automation.
 
 ## Agent Behavior — Credentials
 

@@ -8,7 +8,7 @@ source "${SCRIPT_DIR}/../../shared/lib/platform_version_helpers.sh"
 APP_NAME="Splunk_TA_Cisco_Intersight"
 APP_ID="7828"
 VERIFIED_APP_VERSION="3.1.1"
-PUBLIC_APP_VERSION="3.2.0"
+PUBLIC_APP_VERSION="3.2.2"
 
 INDEXES_ONLY=false
 MACROS_ONLY=false
@@ -42,9 +42,8 @@ require_configuration_version_compatible() {
     local selected_version="${1:-}"
     local version_source="${2:-selected package}"
 
-    [[ "${TARGET_SPLUNK_VERSION}" == "10.5" ]] || return 0
     if [[ "${selected_version}" == "${VERIFIED_APP_VERSION}" ]]; then
-        log "Compatibility preflight passed: ${version_source} ${APP_NAME} (app ID ${APP_ID}) ${VERIFIED_APP_VERSION} is repo-verified for Splunk 10.5."
+        log "Compatibility preflight passed: ${version_source} ${APP_NAME} (app ID ${APP_ID}) ${VERIFIED_APP_VERSION} is repo-verified for supported targets."
         return 0
     fi
     if [[ "${ACCEPT_UNSUPPORTED_PLATFORM}" == "true" ]]; then
@@ -52,9 +51,9 @@ require_configuration_version_compatible() {
         return 0
     fi
 
-    log "ERROR: ${version_source} ${APP_NAME} ${selected_version:-unknown} is not the repo-verified Splunk 10.5 package (${VERIFIED_APP_VERSION})."
+    log "ERROR: ${version_source} ${APP_NAME} ${selected_version:-unknown} is not the repo-reviewed package contract (${VERIFIED_APP_VERSION})."
     if [[ "${selected_version}" == "${PUBLIC_APP_VERSION}" ]]; then
-        log "The public ${PUBLIC_APP_VERSION} release does not advertise Splunk 10.5 compatibility."
+        log "The listing-default ${PUBLIC_APP_VERSION} advertises Splunk 10.5 but not Enterprise 10.6; package inspection alone does not advance the shared pin."
     fi
     log "Refusing configuration before any REST mutation. Pass --accept-unsupported-platform only with documented vendor approval for this exact package and stack."
     return 1
@@ -62,18 +61,15 @@ require_configuration_version_compatible() {
 
 preflight_configuration_platform() {
     resolve_configuration_target_version || return 1
-    if [[ "${TARGET_SPLUNK_VERSION}" == "10.5" && -n "${APP_VERSION}" ]]; then
+    if [[ -n "${APP_VERSION}" ]]; then
         require_configuration_version_compatible "${APP_VERSION}" "selected"
         return $?
     fi
-    if [[ "${TARGET_SPLUNK_VERSION}" == "10.5" ]]; then
-        log "INFO: No --app-version supplied; the installed ${APP_NAME} version will be read and verified before any REST mutation."
-    fi
+    log "INFO: No --app-version supplied; the installed ${APP_NAME} version will be read and verified before any REST mutation."
 }
 
 verify_installed_package_before_mutation() {
     local installed_version
-    [[ "${TARGET_SPLUNK_VERSION}" == "10.5" ]] || return 0
     installed_version="$(rest_get_app_version "$SK" "$SPLUNK_URI" "$APP_NAME" 2>/dev/null || true)"
     require_configuration_version_compatible "${installed_version}" "installed"
 }

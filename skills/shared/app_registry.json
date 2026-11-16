@@ -3,10 +3,10 @@
   "splunkbase_metadata_evidence": {
     "schema_version": 1,
     "path": "skills/shared/references/splunkbase_registry_evidence.json",
-    "sha256": "f37f665c9e32f117aba34a8f46931eb4149669de45293a9e858b2b51ecb0300f",
-    "generated_date": "2026-10-06",
+    "sha256": "299efa6e38c9b4dba1da60d0be4c9cc2ec4f12f85aa6da7d5a8256ae6787ef28",
+    "generated_date": "2026-11-16",
     "max_evidence_age_days": 90,
-    "registry_package_facts_sha256": "753d16b99a1491fa124c68070b2c07eb759f649c0884d19c3adbf2af2d7508ed",
+    "registry_package_facts_sha256": "27e63e69e9f03c8fc36f2eb7823325676f5e1716a17ff110d2cdeb8b8358d4a7",
     "scope": "Public Splunkbase listing and release API metadata/release provenance only; does not verify downloadable package binaries or package checksums."
   },
   "compatibility_target": "10.5",
@@ -135,9 +135,9 @@
         "kind": "app",
         "app_name": "Splunk_TA_Cisco_Intersight",
         "label": "`cisco-intersight-setup`",
-        "cloud_install_path": "ACS Splunkbase pinned to repo-verified 3.1.1 for Splunk 10.5; render/handoff for public 3.2.0 unless a vendor-approved override is recorded",
+        "cloud_install_path": "ACS Splunkbase pinned to reviewed 3.1.1; inspected 3.2.2 has no advertised Enterprise 10.6 support",
         "cloud_config_path": "Target/version preflight, then REST via custom account/input handlers",
-        "notes": "Cisco EULA license-ack required. Verified 3.1.1 advertises Splunk 10.5 and is Cloud-compatible; public 3.2.0 does not advertise 10.5. The setup wrapper reads the installed version and fails before REST mutation unless --accept-unsupported-platform is backed by vendor approval. Index creation uses ACS."
+        "notes": "Cisco EULA license-ack required. Retain 3.1.1 for the shared Enterprise 10.6 default. Inspected 3.2.2 advertises Cloud/Splunk 10.5 but not Enterprise 10.6. Exact package guards precede configuration; live ingestion and dashboard evidence remain required."
       },
       {
         "kind": "app",
@@ -3464,8 +3464,9 @@
       "latest_release_version": "10.3.4",
       "latest_verified_date": "August 11, 2026",
       "latest_release_date": "September 1, 2026",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -3477,6 +3478,7 @@
       ],
       "compatibility_status": "supported",
       "verified_platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -3516,8 +3518,9 @@
       "latest_release_version": "2.1.1",
       "latest_verified_date": "March 30, 2026",
       "latest_release_date": "March 30, 2026",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -3555,8 +3558,9 @@
         "uf_safe": false
       },
       "latest_verified_version": "1.0.30",
-      "latest_release_version": "1.0.31",
+      "latest_release_version": "1.0.50",
       "verified_platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -3567,16 +3571,18 @@
         "9.4"
       ],
       "latest_verified_date": "August 1, 2026",
-      "latest_release_date": "August 31, 2026",
-      "last_verified_date": "August 20, 2026",
+      "latest_release_date": "November 9, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
         "10.3",
         "10.2"
       ],
-      "compatibility_status": "supported"
+      "compatibility_status": "supported",
+      "notes": "Reviewed 1.0.30 is retained behind inspected 1.0.50. Python 3.13 sync commands, catalog fixture/reconciliation, per-member lookup sync, and all four views require qualification before adoption. Exact binary evidence and static contract findings are in the dated docs/cisco-package-review-*-2026-11-16.md reports. No live runtime validation was performed."
     },
     {
       "skill": "cisco-catalyst-ta-setup",
@@ -3603,8 +3609,9 @@
         "uf_safe": false
       },
       "latest_verified_version": "3.2.44",
-      "latest_release_version": "4.0.35",
+      "latest_release_version": "4.0.60",
       "verified_platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -3612,16 +3619,18 @@
         "10.2"
       ],
       "latest_verified_date": "August 15, 2026",
-      "latest_release_date": "September 8, 2026",
-      "last_verified_date": "August 20, 2026",
+      "latest_release_date": "October 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
+        "10.6",
         "10.5",
         "10.4",
         "10.3",
         "10.2"
       ],
       "compatibility_status": "supported",
-      "notes": "Cisco Catalyst TA. Package 3.2.44 was downloaded, unpacked, and inspected in this repository; it advertises Splunk 10.5 through 10.2 and is the reviewed default pin. Reinspect the package schema, source types, and platform metadata before advancing to a newer release."
+      "notes": "Reviewed pin 3.2.44 is retained behind inspected listing default 4.0.60. The TA/app/NetFlow 4.x pair requires migration and dashboard/data-model qualification. Exact binary evidence and static contract findings are in the dated docs/cisco-package-review-*-2026-11-16.md reports. No live runtime validation was performed."
     },
     {
       "skill": "cisco-dc-networking-setup",
@@ -3648,11 +3657,23 @@
         "uf_safe": false
       },
       "latest_verified_version": "1.2.2",
-      "latest_release_version": "1.2.2",
+      "latest_release_version": "2.0.0",
       "latest_verified_date": "July 24, 2026",
-      "latest_release_date": "July 24, 2026",
-      "last_verified_date": "August 20, 2026",
+      "latest_release_date": "November 3, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4"
+      ],
+      "compatibility_status": "supported",
+      "verified_platform_versions": [
         "10.6",
         "10.5",
         "10.4",
@@ -3666,7 +3687,7 @@
         "9.1",
         "9.0"
       ],
-      "compatibility_status": "supported"
+      "notes": "Reviewed 1.2.2 is retained behind inspected Beta 2.0.0. Existing wrappers cover ACI/APIC, Nexus Dashboard and Nexus 9K; new Hyperfabric and MDS/SAN paths require manual handoff and staged migration. Exact binary evidence and static contract findings are in the dated docs/cisco-package-review-*-2026-11-16.md reports. No live runtime validation was performed."
     },
     {
       "skill": "cisco-enterprise-networking-setup",
@@ -3696,8 +3717,9 @@
         "uf_safe": false
       },
       "latest_verified_version": "3.2.20",
-      "latest_release_version": "4.0.10",
+      "latest_release_version": "4.0.20",
       "verified_platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -3705,9 +3727,10 @@
         "10.2"
       ],
       "latest_verified_date": "August 11, 2026",
-      "latest_release_date": "September 4, 2026",
-      "last_verified_date": "August 20, 2026",
+      "latest_release_date": "October 8, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -3715,7 +3738,7 @@
         "10.2"
       ],
       "compatibility_status": "supported",
-      "notes": "Cisco Enterprise Networking visualization app. Package 3.2.20 was downloaded, unpacked, and inspected in this repository; it advertises Splunk 10.5 through 10.2 and is the reviewed default pin. Validate its macro and eventtype contract together with companion TA 7538 before completion."
+      "notes": "Reviewed pin 3.2.20 is retained behind inspected listing default 4.0.20. The 4.x app changes summariesonly defaults and needs paired TA, saved-search, dashboard, and acceleration qualification. Exact binary evidence and static contract findings are in the dated docs/cisco-package-review-*-2026-11-16.md reports. No live runtime validation was performed."
     },
     {
       "skill": "cisco-catalyst-enhanced-netflow-setup",
@@ -3745,8 +3768,10 @@
       "latest_release_version": "4.0.0",
       "latest_verified_date": "September 10, 2024",
       "latest_release_date": "August 26, 2026",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
+        "10.6",
         "10.5",
         "10.4",
         "10.3",
@@ -3754,6 +3779,7 @@
       ],
       "compatibility_status": "supported",
       "verified_platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -3764,7 +3790,8 @@
         "9.4",
         "9.3",
         "9.2"
-      ]
+      ],
+      "notes": "Reviewed pin 2.1.0 is retained behind inspected 4.0.0, which is coordinated with Enterprise Networking 4.x. This mapping add-on does not collect flows; retain the reviewed pair until receiver/decoding and companion dashboard qualification. Exact binary evidence and static contract findings are in the dated docs/cisco-package-review-*-2026-11-16.md reports. No live runtime validation was performed."
     },
     {
       "skill": "cisco-security-cloud-setup",
@@ -3791,8 +3818,9 @@
         "uf_safe": false
       },
       "latest_verified_version": "3.6.10",
-      "latest_release_version": "3.7.2",
+      "latest_release_version": "4.1.3",
       "verified_platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -3806,9 +3834,11 @@
         "9.1"
       ],
       "latest_verified_date": "August 12, 2026",
-      "latest_release_date": "September 17, 2026",
-      "last_verified_date": "August 20, 2026",
+      "latest_release_date": "October 26, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
+        "10.6",
         "10.5",
         "10.4",
         "10.3",
@@ -3821,7 +3851,7 @@
         "9.1"
       ],
       "compatibility_status": "supported",
-      "notes": "Cisco Security Cloud app. Public and repo-verified 3.6.10 advertises Splunk 10.5, so the earlier 10.5 platform hold on 3.6.7 no longer applies and the default pin is 3.6.10. Splunkbase also publishes a parallel 4.0.x line that the listing does not designate as current and this repo has not approved as the default. Use --accept-unverified-release only after reviewing the exact newer package and its granular FTD sourcetype contract."
+      "notes": "Reviewed 3.6.10 is retained behind inspected listing default 4.1.3. The 4.x granular FTD routing changes require migration of custom SPL, alerts, dashboards, eventtypes, tags, and accelerated models before adoption. Exact binary evidence and static contract findings are in the dated docs/cisco-package-review-*-2026-11-16.md reports. No live runtime validation was performed."
     },
     {
       "skill": "cisco-secure-access-setup",
@@ -3847,11 +3877,11 @@
         "needs_packet_capture": false,
         "uf_safe": false
       },
-      "latest_verified_version": "1.0.57",
-      "latest_release_version": "1.0.57",
-      "latest_verified_date": "July 13, 2026",
-      "latest_release_date": "July 13, 2026",
-      "last_verified_date": "August 20, 2026",
+      "latest_verified_version": "1.0.60",
+      "latest_release_version": "1.0.60",
+      "latest_verified_date": "October 21, 2026",
+      "latest_release_date": "October 21, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
         "10.6",
         "10.5",
@@ -3862,7 +3892,18 @@
         "10.0",
         "9.4"
       ],
-      "compatibility_status": "supported"
+      "compatibility_status": "supported",
+      "verified_platform_versions": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4"
+      ],
+      "notes": "Package 1.0.60 downloaded, safely extracted, and statically inspected on 2026-11-16; binary SHA-256 45c6e683f41659552f70f3d49692d67b978a71b362a6ed9374d805a71052d803. See docs/cisco-package-review-security-2026-11-16.md for wrapper/schema, companion, support, runtime, and dashboard boundaries. Live ingestion and dashboard results remain required for completion."
     },
     {
       "skill": "cisco-secure-access-setup",
@@ -3888,22 +3929,33 @@
         "needs_packet_capture": false,
         "uf_safe": false
       },
-      "latest_verified_version": "1.0.53",
-      "latest_release_version": "1.0.55",
-      "latest_verified_date": "July 20, 2026",
-      "latest_release_date": "September 10, 2026",
-      "last_verified_date": "August 20, 2026",
+      "latest_verified_version": "1.0.57",
+      "latest_release_version": "1.0.57",
+      "latest_verified_date": "October 21, 2026",
+      "latest_release_date": "October 21, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.6",
         "10.5",
         "10.4",
         "10.3",
         "10.2",
         "10.1",
-        "10.0"
+        "10.0",
+        "9.4"
       ],
       "compatibility_status": "supported",
-      "verified_platform_versions": [],
-      "verified_release_evidence_status": "historical-review-only-not-currently-reproducible"
+      "verified_platform_versions": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4"
+      ],
+      "notes": "Package 1.0.57 downloaded, safely extracted, and statically inspected on 2026-11-16; binary SHA-256 1c7811dd49976f4a923321f3c02a0dfd04dca1411d66f4c846750f5dffdf13f9. See docs/cisco-package-review-security-2026-11-16.md for wrapper/schema, companion, support, runtime, and dashboard boundaries. Live ingestion and dashboard results remain required for completion."
     },
     {
       "skill": "cisco-intersight-setup",
@@ -3944,7 +3996,7 @@
       ],
       "latest_verified_date": "March 27, 2026",
       "latest_release_date": "September 23, 2026",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
         "10.5",
         "10.4",
@@ -3956,7 +4008,7 @@
         "9.3"
       ],
       "compatibility_status": "supported",
-      "notes": "Cisco Intersight Add-On. Repo-verified 3.1.1 advertises Splunk 10.5 and is Cloud-compatible; current public 3.2.2 does not list 10.5. Pin 3.1.1 on a Splunk 10.5 search tier or heavy forwarder, or render/hand off unless a vendor-approved override permits another version."
+      "notes": "Inspected 3.2.2 on 2026-11-16, binary SHA-256 5046084bbe9d0ce76dcdd442e1b231f9f0a86cc5aef5bb3536d0e73b2c333a5f. Retain selected 3.1.1 because the current 3.2.2 release advertises Splunk through 10.5 and does not explicitly advertise Enterprise 10.6. Package inspection does not override the platform evidence gate. See docs/cisco-package-review-network-dc-2026-11-16.md."
     },
     {
       "skill": "cisco-appdynamics-setup",
@@ -3982,26 +4034,33 @@
         "needs_packet_capture": false,
         "uf_safe": false
       },
-      "latest_verified_version": "3.2.1",
-      "latest_release_version": "3.2.1",
-      "latest_verified_date": "May 1, 2026",
-      "latest_release_date": "May 1, 2026",
-      "last_verified_date": "August 20, 2026",
+      "latest_verified_version": "3.3.0",
+      "latest_release_version": "3.3.0",
+      "latest_verified_date": "October 22, 2026",
+      "latest_release_date": "October 22, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
         "10.3",
         "10.2",
         "10.1",
-        "10.0",
-        "9.4",
-        "9.3",
-        "9.2",
-        "9.1",
-        "9.0"
+        "10.0"
       ],
-      "compatibility_status": "supported"
+      "compatibility_status": "supported",
+      "verified_platform_versions": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0"
+      ],
+      "notes": "Package 3.3.0 downloaded, safely extracted, and statically inspected on 2026-11-16; binary SHA-256 ee7f6de3160a1a4cdf5c1193484dd23e8d4f2fb6e91c9990456259e82068a7e6. See docs/cisco-package-review-security-2026-11-16.md for wrapper/schema, companion, support, runtime, and dashboard boundaries. Live ingestion and dashboard results remain required for completion."
     },
     {
       "skill": "cisco-meraki-ta-setup",
@@ -4027,25 +4086,29 @@
         "needs_packet_capture": false,
         "uf_safe": false
       },
-      "latest_verified_version": "3.4.0",
+      "latest_verified_version": "3.5.0",
       "latest_release_version": "3.5.0",
       "verified_platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
         "10.3",
         "10.2"
       ],
-      "latest_verified_date": "August 14, 2026",
+      "latest_verified_date": "September 24, 2026",
       "latest_release_date": "September 24, 2026",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
+        "10.6",
         "10.5",
         "10.4",
         "10.3",
         "10.2"
       ],
-      "compatibility_status": "supported"
+      "compatibility_status": "supported",
+      "notes": "Package 3.5.0 downloaded, safely extracted, and statically inspected on 2026-11-16; binary SHA-256 edd12274203a367e73c8f3ae2115ad18008b6f20f46614602b724fc7758ac8e8. See docs/cisco-package-review-security-2026-11-16.md for wrapper/schema, companion, support, runtime, and dashboard boundaries. Live ingestion and dashboard results remain required for completion."
     },
     {
       "skill": "cisco-webex-setup",
@@ -4075,7 +4138,7 @@
       "latest_release_version": "1.4.3",
       "latest_verified_date": "July 15, 2026",
       "latest_release_date": "July 15, 2026",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
         "10.6",
         "10.5",
@@ -4117,8 +4180,9 @@
       "latest_release_version": "2.0.0",
       "latest_verified_date": "April 30, 2026",
       "latest_release_date": "April 30, 2026",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -4158,9 +4222,10 @@
         "needs_packet_capture": false,
         "uf_safe": false
       },
-      "latest_verified_version": "4.3.3",
-      "latest_release_version": "4.3.3",
+      "latest_verified_version": "5.0.0",
+      "latest_release_version": "5.0.0",
       "verified_platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -4173,10 +4238,11 @@
         "9.2",
         "9.1"
       ],
-      "latest_verified_date": "September 10, 2026",
-      "latest_release_date": "September 10, 2026",
-      "last_verified_date": "October 6, 2026",
+      "latest_verified_date": "October 21, 2026",
+      "latest_release_date": "October 21, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -4190,7 +4256,7 @@
         "9.1"
       ],
       "compatibility_status": "supported",
-      "notes": "Package 4.3.3 was downloaded and inspected on 2026-10-06; SHA-256 fc9eea8b4c0ae78cd49b52de0533a6e0dfdbdf7498c54a497205fee6c535d0ce. Splunkbase release metadata explicitly lists Enterprise 10.6."
+      "notes": "Package 5.0.0 downloaded, safely extracted, and statically inspected on 2026-11-16; binary SHA-256 dbda2c808b0cd56881e34b43c07ccfb0d6de4ec8623e9ffc6d6356efae181570. See docs/cisco-package-review-network-dc-2026-11-16.md for handlers, fields, dashboards, and migration boundaries. No live deployment or runtime validation was performed."
     },
     {
       "skill": "cisco-secure-email-web-gateway-setup",
@@ -4216,9 +4282,10 @@
         "needs_packet_capture": false,
         "uf_safe": false
       },
-      "latest_verified_version": "1.7.1",
-      "latest_release_version": "1.7.1",
+      "latest_verified_version": "1.8.0",
+      "latest_release_version": "1.8.0",
       "verified_platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -4231,10 +4298,11 @@
         "9.2",
         "9.1"
       ],
-      "latest_verified_date": "June 30, 2026",
-      "latest_release_date": "June 30, 2026",
-      "last_verified_date": "August 20, 2026",
+      "latest_verified_date": "October 12, 2026",
+      "latest_release_date": "October 12, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -4247,7 +4315,8 @@
         "9.2",
         "9.1"
       ],
-      "compatibility_status": "supported"
+      "compatibility_status": "supported",
+      "notes": "Package 1.8.0 downloaded, safely extracted, and statically inspected on 2026-11-16; binary SHA-256 486010da6765b8eb63b616912b38a0186c80c95ef7dc3f74e19592346bdb1a5a. See docs/cisco-package-review-security-2026-11-16.md for wrapper/schema, companion, support, runtime, and dashboard boundaries. Live ingestion and dashboard results remain required for completion."
     },
     {
       "skill": "cisco-secure-email-web-gateway-setup",
@@ -4277,8 +4346,9 @@
       "latest_release_version": "5.0.0",
       "latest_verified_date": "December 13, 2024",
       "latest_release_date": "December 13, 2024",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -4330,7 +4400,7 @@
       ],
       "latest_verified_date": "June 18, 2026",
       "latest_release_date": "June 18, 2026",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
         "10.6",
         "10.5",
@@ -4367,11 +4437,23 @@
         "uf_safe": false
       },
       "latest_verified_version": "8.1.6",
-      "latest_release_version": "8.1.6",
+      "latest_release_version": "8.1.7",
       "latest_verified_date": "March 3, 2026",
-      "latest_release_date": "March 3, 2026",
-      "last_verified_date": "August 20, 2026",
+      "latest_release_date": "October 12, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4"
+      ],
+      "compatibility_status": "supported",
+      "verified_platform_versions": [
         "10.6",
         "10.5",
         "10.4",
@@ -4381,8 +4463,7 @@
         "10.0",
         "9.4",
         "9.3"
-      ],
-      "compatibility_status": "supported"
+      ]
     },
     {
       "skill": "splunk-stream-setup",
@@ -4413,11 +4494,22 @@
         "uf_safe": true
       },
       "latest_verified_version": "8.1.6",
-      "latest_release_version": "8.1.6",
+      "latest_release_version": "8.1.7",
       "latest_verified_date": "March 3, 2026",
-      "latest_release_date": "March 3, 2026",
-      "last_verified_date": "August 20, 2026",
+      "latest_release_date": "October 12, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4"
+      ],
+      "compatibility_status": "supported",
+      "verified_platform_versions": [
         "10.6",
         "10.5",
         "10.4",
@@ -4427,8 +4519,7 @@
         "10.0",
         "9.4",
         "9.3"
-      ],
-      "compatibility_status": "supported"
+      ]
     },
     {
       "skill": "splunk-stream-setup",
@@ -4455,11 +4546,24 @@
         "uf_safe": false
       },
       "latest_verified_version": "8.1.6",
-      "latest_release_version": "8.1.6",
+      "latest_release_version": "8.1.7",
       "latest_verified_date": "March 3, 2026",
-      "latest_release_date": "March 3, 2026",
-      "last_verified_date": "August 20, 2026",
+      "latest_release_date": "October 12, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4"
+      ],
+      "compatibility_status": "supported",
+      "verified_platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -4472,8 +4576,7 @@
         "9.2",
         "9.1",
         "9.0"
-      ],
-      "compatibility_status": "supported"
+      ]
     },
     {
       "skill": "cisco-thousandeyes-setup",
@@ -4499,12 +4602,13 @@
         "needs_packet_capture": false,
         "uf_safe": false
       },
-      "latest_verified_version": "0.8.0",
+      "latest_verified_version": "0.9.0",
       "latest_release_version": "0.9.0",
-      "latest_verified_date": "June 9, 2026",
+      "latest_verified_date": "August 24, 2026",
       "latest_release_date": "August 24, 2026",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -4519,6 +4623,7 @@
       ],
       "compatibility_status": "supported",
       "verified_platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -4530,7 +4635,8 @@
         "9.3",
         "9.2",
         "9.1"
-      ]
+      ],
+      "notes": "Package 0.9.0 downloaded, safely extracted, and statically inspected on 2026-11-16; binary SHA-256 2206fe9a288060a0a8d4e780cbba8c56ecd1c18cf53c965b60b505c3524cf6af. See docs/cisco-package-review-security-2026-11-16.md for wrapper/schema, companion, support, runtime, and dashboard boundaries. Live ingestion and dashboard results remain required for completion."
     },
     {
       "skill": "splunk-itsi-setup",
@@ -4559,8 +4665,9 @@
         "uf_safe": false
       },
       "latest_verified_version": "5.0.2",
-      "latest_release_version": "5.0.2",
+      "latest_release_version": "5.0.3",
       "verified_platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -4568,9 +4675,10 @@
         "10.2"
       ],
       "latest_verified_date": "September 17, 2026",
-      "latest_release_date": "September 17, 2026",
-      "last_verified_date": "October 6, 2026",
+      "latest_release_date": "October 28, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -4613,6 +4721,7 @@
       "latest_verified_version": "2.5.1",
       "latest_release_version": "2.5.1",
       "verified_platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -4621,8 +4730,9 @@
       ],
       "latest_verified_date": "July 2, 2026",
       "latest_release_date": "July 2, 2026",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -4658,7 +4768,7 @@
         "uf_safe": false
       },
       "latest_verified_version": "8.5.1",
-      "latest_release_version": "8.7.1",
+      "latest_release_version": "8.8.0",
       "verified_platform_versions": [
         "10.6",
         "10.5",
@@ -4671,9 +4781,10 @@
         "9.3"
       ],
       "latest_verified_date": "April 16, 2026",
-      "latest_release_date": "October 1, 2026",
-      "last_verified_date": "August 20, 2026",
+      "latest_release_date": "November 4, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -4709,11 +4820,23 @@
         "uf_safe": false
       },
       "latest_verified_version": "3.8.3",
-      "latest_release_version": "3.8.3",
+      "latest_release_version": "3.8.4",
       "latest_verified_date": "January 21, 2026",
-      "latest_release_date": "January 21, 2026",
-      "last_verified_date": "August 20, 2026",
+      "latest_release_date": "October 28, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4"
+      ],
+      "compatibility_status": "supported",
+      "verified_platform_versions": [
         "10.6",
         "10.5",
         "10.4",
@@ -4726,8 +4849,7 @@
         "9.2",
         "9.1",
         "9.0"
-      ],
-      "compatibility_status": "supported"
+      ]
     },
     {
       "skill": "splunk-asset-risk-intelligence-setup",
@@ -4755,22 +4877,21 @@
         "uf_safe": false
       },
       "latest_verified_version": "1.2.2",
-      "latest_release_version": "1.2.2",
+      "latest_release_version": "1.2.3",
       "latest_verified_date": "June 10, 2026",
-      "latest_release_date": "June 10, 2026",
-      "last_verified_date": "August 20, 2026",
+      "latest_release_date": "November 11, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
         "10.3",
-        "10.2",
-        "10.1",
-        "10.0",
-        "9.4",
-        "9.3"
+        "10.2"
       ],
-      "compatibility_status": "supported"
+      "compatibility_status": "supported",
+      "verified_release_evidence_status": "historical-review-only-not-currently-reproducible",
+      "verified_platform_versions": []
     },
     {
       "skill": "splunk-asset-risk-intelligence-setup",
@@ -4801,8 +4922,9 @@
       "latest_release_version": "1.2.0",
       "latest_verified_date": "September 17, 2025",
       "latest_release_date": "September 17, 2025",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -4847,8 +4969,9 @@
       "latest_release_version": "1.2.0",
       "latest_verified_date": "September 17, 2025",
       "latest_release_date": "September 17, 2025",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -4894,8 +5017,9 @@
       "latest_release_version": "1.2.0",
       "latest_verified_date": "September 17, 2025",
       "latest_release_date": "September 17, 2025",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -4937,11 +5061,13 @@
         "uf_safe": false
       },
       "latest_verified_version": "1.3.0",
-      "latest_release_version": "1.3.1",
+      "latest_release_version": "1.3.2",
       "latest_verified_date": "July 3, 2026",
-      "latest_release_date": "September 14, 2026",
-      "last_verified_date": "August 20, 2026",
+      "latest_release_date": "November 5, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
+        "10.6",
         "10.5",
         "10.4",
         "10.3",
@@ -4952,6 +5078,7 @@
       ],
       "compatibility_status": "supported",
       "verified_platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -4994,8 +5121,9 @@
       "latest_release_version": "1.3.0",
       "latest_verified_date": "July 3, 2026",
       "latest_release_date": "July 3, 2026",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -5033,11 +5161,12 @@
         "uf_safe": false
       },
       "latest_verified_version": "8.6.0",
-      "latest_release_version": "8.7.0",
+      "latest_release_version": "8.8.0",
       "latest_verified_date": "July 20, 2026",
-      "latest_release_date": "September 2, 2026",
-      "last_verified_date": "August 20, 2026",
+      "latest_release_date": "November 3, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -5046,6 +5175,7 @@
       ],
       "compatibility_status": "supported",
       "verified_platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -5082,11 +5212,12 @@
         "uf_safe": false
       },
       "latest_verified_version": "8.7.0",
-      "latest_release_version": "8.7.0",
+      "latest_release_version": "8.8.0",
       "latest_verified_date": "September 2, 2026",
-      "latest_release_date": "September 2, 2026",
-      "last_verified_date": "October 6, 2026",
+      "latest_release_date": "November 3, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -5095,6 +5226,7 @@
       ],
       "compatibility_status": "supported",
       "verified_platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -5134,8 +5266,10 @@
       "latest_release_version": "1.4.7",
       "latest_verified_date": "March 18, 2025",
       "latest_release_date": "September 16, 2026",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
+        "10.6",
         "10.5",
         "10.4",
         "10.3",
@@ -5186,25 +5320,13 @@
         "uf_safe": false
       },
       "latest_verified_version": "6.4.0",
-      "latest_release_version": "6.7.0",
-      "verified_platform_versions": [
-        "10.6",
-        "10.5",
-        "10.4",
-        "10.3",
-        "10.2",
-        "10.1",
-        "10.0",
-        "9.4",
-        "9.3",
-        "9.2",
-        "9.1",
-        "9.0"
-      ],
+      "latest_release_version": "6.10.0",
+      "verified_platform_versions": [],
       "latest_verified_date": "August 12, 2026",
-      "latest_release_date": "September 23, 2026",
-      "last_verified_date": "August 20, 2026",
+      "latest_release_date": "November 4, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -5218,7 +5340,8 @@
         "9.1",
         "9.0"
       ],
-      "compatibility_status": "supported"
+      "compatibility_status": "supported",
+      "verified_release_evidence_status": "historical-review-only-not-currently-reproducible"
     },
     {
       "skill": "cisco-asa-ta-setup",
@@ -5248,6 +5371,7 @@
       "latest_verified_version": "6.1.2",
       "latest_release_version": "6.1.2",
       "verified_platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -5260,8 +5384,9 @@
       ],
       "latest_verified_date": "July 29, 2026",
       "latest_release_date": "July 29, 2026",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -5300,11 +5425,12 @@
         "uf_safe": false
       },
       "latest_verified_version": "8.5.0",
-      "latest_release_version": "8.7.0",
+      "latest_release_version": "8.8.0",
       "latest_verified_date": "April 2, 2026",
-      "latest_release_date": "September 2, 2026",
-      "last_verified_date": "August 20, 2026",
+      "latest_release_date": "October 21, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -5316,6 +5442,7 @@
       ],
       "compatibility_status": "supported",
       "verified_platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -5356,11 +5483,12 @@
         "uf_safe": false
       },
       "latest_verified_version": "8.6.1",
-      "latest_release_version": "8.7.1",
+      "latest_release_version": "8.8.0",
       "latest_verified_date": "August 4, 2026",
-      "latest_release_date": "October 1, 2026",
-      "last_verified_date": "August 20, 2026",
+      "latest_release_date": "November 4, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -5369,6 +5497,7 @@
       ],
       "compatibility_status": "supported",
       "verified_platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -5408,11 +5537,12 @@
         "uf_safe": false
       },
       "latest_verified_version": "8.6.1",
-      "latest_release_version": "8.7.1",
+      "latest_release_version": "8.8.0",
       "latest_verified_date": "August 4, 2026",
-      "latest_release_date": "October 1, 2026",
-      "last_verified_date": "August 20, 2026",
+      "latest_release_date": "November 4, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -5421,6 +5551,7 @@
       ],
       "compatibility_status": "supported",
       "verified_platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -5462,6 +5593,7 @@
       "latest_verified_version": "1.7.2",
       "latest_release_version": "1.7.2",
       "verified_platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -5474,8 +5606,9 @@
       ],
       "latest_verified_date": "June 26, 2026",
       "latest_release_date": "June 26, 2026",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -5517,8 +5650,9 @@
       "latest_release_version": "4.0.8",
       "latest_verified_date": "August 13, 2026",
       "latest_release_date": "August 13, 2026",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -5543,8 +5677,9 @@
       ],
       "min_splunk_version": "9.3",
       "latest_verified_version": "2.2.0",
-      "latest_release_version": "2.3.3",
+      "latest_release_version": "2.3.6",
       "verified_platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -5571,9 +5706,10 @@
         "uf_safe": false
       },
       "latest_verified_date": "July 22, 2026",
-      "latest_release_date": "September 22, 2026",
-      "last_verified_date": "August 20, 2026",
+      "latest_release_date": "October 16, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -5597,8 +5733,9 @@
       ],
       "min_splunk_version": "9.3",
       "latest_verified_version": "4.3.4",
-      "latest_release_version": "4.3.4",
+      "latest_release_version": "4.3.5",
       "verified_platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -5626,9 +5763,10 @@
       },
       "notes": "PSC target for Linux 64-bit search heads and the default Splunk Cloud AI Toolkit runtime dependency.",
       "latest_verified_date": "July 22, 2026",
-      "latest_release_date": "July 22, 2026",
-      "last_verified_date": "August 20, 2026",
+      "latest_release_date": "October 13, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -5652,8 +5790,9 @@
       ],
       "min_splunk_version": "9.3",
       "latest_verified_version": "4.3.4",
-      "latest_release_version": "4.3.4",
+      "latest_release_version": "4.3.5",
       "verified_platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -5681,9 +5820,10 @@
       },
       "notes": "PSC target for Windows 64-bit search heads.",
       "latest_verified_date": "July 22, 2026",
-      "latest_release_date": "July 22, 2026",
-      "last_verified_date": "August 20, 2026",
+      "latest_release_date": "October 13, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -5709,6 +5849,7 @@
       "latest_verified_version": "4.3.4",
       "latest_release_version": "4.3.4",
       "verified_platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -5737,8 +5878,9 @@
       "notes": "PSC target for Mac Intel search heads.",
       "latest_verified_date": "July 22, 2026",
       "latest_release_date": "July 22, 2026",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -5762,8 +5904,9 @@
       ],
       "min_splunk_version": "9.3",
       "latest_verified_version": "4.3.4",
-      "latest_release_version": "4.3.4",
+      "latest_release_version": "4.3.5",
       "verified_platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -5791,9 +5934,10 @@
       },
       "notes": "PSC target for Mac Apple Silicon search heads.",
       "latest_verified_date": "July 22, 2026",
-      "latest_release_date": "July 22, 2026",
-      "last_verified_date": "August 20, 2026",
+      "latest_release_date": "October 13, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -5817,8 +5961,9 @@
       ],
       "min_splunk_version": "9.3",
       "latest_verified_version": "6.0.2",
-      "latest_release_version": "6.1.0",
+      "latest_release_version": "6.2.0",
       "verified_platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -5846,9 +5991,10 @@
       },
       "notes": "Splunk AI Toolkit / MLTK app. Requires the PSC add-on matching the search-head OS; supports ML-SPL, Smart Assistants, anomaly workflows, LLM ai command provider handoffs, ONNX, alerts, and model inventory.",
       "latest_verified_date": "August 10, 2026",
-      "latest_release_date": "August 25, 2026",
-      "last_verified_date": "August 20, 2026",
+      "latest_release_date": "October 14, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -5894,8 +6040,9 @@
       "notes": "DSDL extends AI Toolkit with external Docker, Kubernetes, OpenShift, HPC, GPU, air-gapped image, Jupyter notebook, RAG/LLM, and model governance workflows. Runtime setup is rendered as a handoff by default.",
       "latest_verified_date": "May 22, 2026",
       "latest_release_date": "May 22, 2026",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -5942,11 +6089,12 @@
         "uf_safe": false
       },
       "latest_verified_version": "1.3.1",
-      "latest_release_version": "2.0.0",
+      "latest_release_version": "2.1.0",
       "latest_verified_date": "August 3, 2026",
-      "latest_release_date": "September 3, 2026",
-      "last_verified_date": "August 22, 2026",
+      "latest_release_date": "October 24, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -5958,6 +6106,7 @@
         "9.3"
       ],
       "verified_platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -5998,29 +6147,29 @@
         "needs_packet_capture": false,
         "uf_safe": false
       },
-      "latest_verified_version": "2.0.1",
+      "latest_verified_version": "2.0.20",
       "latest_release_version": "2.0.20",
       "verified_platform_versions": [
-        "10.6",
-        "10.5",
-        "10.4",
-        "10.3",
-        "10.2",
-        "10.1",
-        "10.0",
-        "9.4"
-      ],
-      "latest_verified_date": "July 31, 2026",
-      "latest_release_date": "September 21, 2026",
-      "last_verified_date": "August 20, 2026",
-      "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
         "10.3",
         "10.2"
       ],
-      "compatibility_status": "supported"
+      "latest_verified_date": "September 21, 2026",
+      "latest_release_date": "September 21, 2026",
+      "last_verified_date": "November 16, 2026",
+      "platform_versions": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2"
+      ],
+      "compatibility_status": "supported",
+      "notes": "Package 2.0.20 downloaded, safely extracted, and statically inspected on 2026-11-16; binary SHA-256 b98bb349568eeae3df9b27ccedbaca06374386b99dcfcb87e8a2f6456a7fd07e. See docs/cisco-package-review-security-2026-11-16.md for wrapper/schema, companion, support, runtime, and dashboard boundaries. Live ingestion and dashboard results remain required for completion."
     },
     {
       "skill": "splunk-connect-for-otlp-setup",
@@ -6050,10 +6199,10 @@
       },
       "notes": "OTLP gRPC/HTTP modular input backed by HEC token authentication. Audited package contains Linux x86_64 and Windows x86_64 binaries only, no Darwin/default-bin executable, no dashboards, no setup page, no KV Store, no custom REST handlers, and no Python runtime. External-collector role means sender/client configuration only. Splunkbase lists platform 10.5 but marks this release cloud_compatible=false and rejects both single-instance and distributed Cloud install methods.",
       "latest_verified_version": "0.4.1",
-      "latest_release_version": "0.161.0",
+      "latest_release_version": "0.164.0",
       "latest_verified_date": "May 1, 2026",
-      "latest_release_date": "September 18, 2026",
-      "last_verified_date": "August 20, 2026",
+      "latest_release_date": "October 30, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
         "10.5",
         "10.4",
@@ -6104,8 +6253,9 @@
       "latest_release_version": "4.3.0",
       "latest_verified_date": "May 11, 2026",
       "latest_release_date": "May 11, 2026",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -6149,11 +6299,12 @@
         "uf_safe": false
       },
       "latest_verified_version": "1.2.2",
-      "latest_release_version": "1.2.2",
+      "latest_release_version": "1.2.3",
       "latest_verified_date": "September 3, 2025",
-      "latest_release_date": "September 3, 2025",
-      "last_verified_date": "August 20, 2026",
+      "latest_release_date": "September 16, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -6164,7 +6315,19 @@
         "9.4",
         "9.3"
       ],
-      "compatibility_status": "supported"
+      "compatibility_status": "supported",
+      "verified_platform_versions": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ]
     },
     {
       "skill": "splunk-db-connect-setup",
@@ -6197,8 +6360,9 @@
       "latest_release_version": "1.3.2",
       "latest_verified_date": "August 8, 2025",
       "latest_release_date": "August 8, 2025",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -6245,8 +6409,9 @@
       "latest_release_version": "2.2.2",
       "latest_verified_date": "September 3, 2025",
       "latest_release_date": "September 3, 2025",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -6293,8 +6458,9 @@
       "latest_release_version": "1.2.2",
       "latest_verified_date": "September 3, 2025",
       "latest_release_date": "September 3, 2025",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -6338,8 +6504,9 @@
       "latest_release_version": "1.2.4",
       "latest_verified_date": "March 19, 2026",
       "latest_release_date": "March 19, 2026",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -6386,8 +6553,9 @@
       "latest_release_version": "1.1.3",
       "latest_verified_date": "September 3, 2025",
       "latest_release_date": "September 3, 2025",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -6433,8 +6601,9 @@
       "latest_release_version": "1.1.1",
       "latest_verified_date": "September 22, 2025",
       "latest_release_date": "September 22, 2025",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -6478,8 +6647,9 @@
       "latest_release_version": "1.3.0",
       "latest_verified_date": "September 3, 2025",
       "latest_release_date": "September 3, 2025",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -6523,11 +6693,12 @@
         "uf_safe": false
       },
       "latest_verified_version": "1.0.1",
-      "latest_release_version": "1.0.1",
+      "latest_release_version": "1.0.2",
       "latest_verified_date": "December 16, 2025",
-      "latest_release_date": "December 16, 2025",
-      "last_verified_date": "August 20, 2026",
+      "latest_release_date": "September 23, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -6541,7 +6712,22 @@
         "9.1",
         "9.0"
       ],
-      "compatibility_status": "supported"
+      "compatibility_status": "supported",
+      "verified_platform_versions": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ]
     },
     {
       "skill": "splunk-observability-cloud-integration-setup",
@@ -6571,8 +6757,9 @@
       "latest_release_version": "1.3.1",
       "latest_verified_date": "July 13, 2026",
       "latest_release_date": "July 13, 2026",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -6609,6 +6796,7 @@
       "latest_verified_version": "6.3.1",
       "latest_release_version": "6.3.3",
       "verified_platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -6621,8 +6809,9 @@
       ],
       "latest_verified_date": "July 28, 2026",
       "latest_release_date": "September 10, 2026",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -6664,8 +6853,9 @@
       "latest_release_version": "2.1.1",
       "latest_verified_date": "December 11, 2024",
       "latest_release_date": "December 11, 2024",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -6707,20 +6897,13 @@
       "notes": "GCP log ingestion TA (Pub/Sub, Cloud Storage, Cloud Audit Logs). GCP metrics go through the Splunk Observability GCP integration; logs go through this TA. Hand-off from splunk-observability-gcp-integration.",
       "latest_verified_version": "5.1.1",
       "latest_release_version": "5.2.0",
-      "verified_platform_versions": [
-        "10.5",
-        "10.4",
-        "10.3",
-        "10.2",
-        "10.1",
-        "10.0",
-        "9.4",
-        "9.3"
-      ],
+      "verified_platform_versions": [],
       "latest_verified_date": "August 13, 2026",
       "latest_release_date": "September 23, 2026",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
+        "10.6",
         "10.5",
         "10.4",
         "10.3",
@@ -6757,7 +6940,7 @@
         "uf_safe": false
       },
       "latest_verified_version": "4.0.0",
-      "latest_release_version": "5.0.1",
+      "latest_release_version": "5.1.0",
       "verified_platform_versions": [
         "10.6",
         "10.5",
@@ -6771,9 +6954,11 @@
         "9.2"
       ],
       "latest_verified_date": "May 27, 2026",
-      "latest_release_date": "August 28, 2026",
-      "last_verified_date": "August 20, 2026",
+      "latest_release_date": "November 2, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
+        "10.6",
         "10.5",
         "10.4",
         "10.3",
@@ -6781,13 +6966,10 @@
         "10.1",
         "10.0",
         "9.4",
-        "9.3",
-        "9.2",
-        "9.1",
-        "9.0"
+        "9.3"
       ],
       "compatibility_status": "supported",
-      "notes": "Google Workspace collection TA. Repo-verified 4.0.0 advertises Splunk 10.5 and is Cloud-compatible; current public 5.0.1 does not list 10.5. Pin 4.0.0 on a Splunk 10.5 search tier or heavy forwarder, or render/hand off unless a vendor-approved override permits another version."
+      "notes": "Google Workspace collection TA. Repo-reviewed 4.0.0 is retained for Splunk 10.5. Public 5.1.0 now advertises 10.5, but its package/configuration contract was not inspected in this Cisco audit. The former public-version platform gap does not justify advancing the selected pin without package review."
     },
     {
       "skill": "splunk-microsoft-security-ta-setup",
@@ -6814,8 +6996,9 @@
         "uf_safe": false
       },
       "latest_verified_version": "4.0.0",
-      "latest_release_version": "4.0.0",
+      "latest_release_version": "5.0.0",
       "verified_platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -6828,9 +7011,10 @@
         "9.2"
       ],
       "latest_verified_date": "July 21, 2026",
-      "latest_release_date": "July 21, 2026",
-      "last_verified_date": "August 20, 2026",
+      "latest_release_date": "November 5, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -6839,8 +7023,7 @@
         "10.1",
         "10.0",
         "9.4",
-        "9.3",
-        "9.2"
+        "9.3"
       ],
       "compatibility_status": "supported"
     },
@@ -6871,6 +7054,7 @@
       "latest_verified_version": "5.0.1",
       "latest_release_version": "5.0.1",
       "verified_platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -6884,8 +7068,9 @@
       ],
       "latest_verified_date": "July 6, 2026",
       "latest_release_date": "July 6, 2026",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -6925,20 +7110,13 @@
       },
       "latest_verified_version": "4.0.0",
       "latest_release_version": "4.0.1",
-      "verified_platform_versions": [
-        "10.5",
-        "10.4",
-        "10.3",
-        "10.2",
-        "10.1",
-        "10.0",
-        "9.4",
-        "9.3"
-      ],
+      "verified_platform_versions": [],
       "latest_verified_date": "August 11, 2026",
       "latest_release_date": "September 10, 2026",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
+        "10.6",
         "10.5",
         "10.4",
         "10.3",
@@ -6977,8 +7155,9 @@
       },
       "notes": "Salesforce object and event-log modular inputs; run each org input set on one search tier or heavy forwarder.",
       "latest_verified_version": "7.0.0",
-      "latest_release_version": "7.0.1",
+      "latest_release_version": "7.0.2",
       "verified_platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -6990,9 +7169,10 @@
         "9.3"
       ],
       "latest_verified_date": "July 31, 2026",
-      "latest_release_date": "September 3, 2026",
-      "last_verified_date": "August 20, 2026",
+      "latest_release_date": "October 21, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -7033,6 +7213,7 @@
       "latest_verified_version": "5.0.1",
       "latest_release_version": "5.0.1",
       "verified_platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -7045,8 +7226,9 @@
       ],
       "latest_verified_date": "September 24, 2026",
       "latest_release_date": "September 24, 2026",
-      "last_verified_date": "October 6, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -7088,21 +7270,11 @@
       "latest_release_version": "5.0.1",
       "latest_verified_date": "July 3, 2026",
       "latest_release_date": "September 7, 2026",
-      "last_verified_date": "August 20, 2026",
-      "verified_platform_versions": [
-        "10.5",
-        "10.4",
-        "10.3",
-        "10.2",
-        "10.1",
-        "10.0",
-        "9.4",
-        "9.3",
-        "9.2",
-        "9.1",
-        "9.0"
-      ],
+      "last_verified_date": "November 16, 2026",
+      "verified_platform_versions": [],
       "platform_versions": [
+        "10.7",
+        "10.6",
         "10.5",
         "10.4",
         "10.3",
@@ -7120,9 +7292,9 @@
       "app_name": "Splunk_TA_cyberark",
       "splunkbase_id": "2891",
       "relationship": "legacy-parser",
-      "cloud_compatible": false,
-      "install_method_single": "rejected",
-      "install_method_distributed": "rejected",
+      "cloud_compatible": true,
+      "install_method_single": "simple",
+      "install_method_distributed": "appmgmt_phase",
       "label": "Splunk Add-on for CyberArk",
       "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
       "package_patterns": [
@@ -7145,11 +7317,24 @@
       },
       "notes": "Archived/not-supported CyberArk EPV/PTA parser-only package; use explicit SC4S/syslog transport ownership.",
       "latest_verified_version": "1.2.0",
-      "latest_release_version": "1.2.0",
+      "latest_release_version": "2.0.0",
       "latest_verified_date": "December 2, 2021",
-      "latest_release_date": "December 2, 2021",
-      "last_verified_date": "August 20, 2026",
+      "latest_release_date": "October 2, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "compatibility_status": "supported",
+      "verified_platform_versions": [
         "10.6",
         "10.5",
         "10.4",
@@ -7162,8 +7347,7 @@
         "9.2",
         "9.1",
         "9.0"
-      ],
-      "compatibility_status": "supported"
+      ]
     },
     {
       "skill": "splunk-rsa-securid-ta-setup",
@@ -7193,6 +7377,7 @@
       "latest_verified_version": "1.2.3",
       "latest_release_version": "1.2.3",
       "verified_platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -7205,8 +7390,9 @@
       ],
       "latest_verified_date": "August 12, 2026",
       "latest_release_date": "August 12, 2026",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -7248,8 +7434,9 @@
       "latest_release_version": "1.5.0",
       "latest_verified_date": "November 6, 2025",
       "latest_release_date": "November 6, 2025",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -7292,8 +7479,9 @@
       "latest_release_version": "3.0.0",
       "latest_verified_date": "April 9, 2026",
       "latest_release_date": "April 9, 2026",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -7334,6 +7522,7 @@
       "latest_verified_version": "3.3.2",
       "latest_release_version": "3.3.2",
       "verified_platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -7345,8 +7534,9 @@
       ],
       "latest_verified_date": "September 10, 2026",
       "latest_release_date": "September 10, 2026",
-      "last_verified_date": "October 6, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -7387,8 +7577,9 @@
       "latest_release_version": "2.0.0",
       "latest_verified_date": "April 9, 2025",
       "latest_release_date": "April 9, 2025",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -7432,6 +7623,7 @@
       "latest_verified_version": "4.0.4",
       "latest_release_version": "4.0.4",
       "verified_platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -7444,8 +7636,9 @@
       ],
       "latest_verified_date": "September 10, 2026",
       "latest_release_date": "September 10, 2026",
-      "last_verified_date": "October 6, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -7491,7 +7684,7 @@
       "latest_release_version": "2.0.0",
       "latest_verified_date": "November 23, 2020",
       "latest_release_date": "November 23, 2020",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
         "10.6",
         "10.5",
@@ -7541,7 +7734,7 @@
       "latest_release_version": "2.1.0",
       "latest_verified_date": "December 1, 2023",
       "latest_release_date": "December 1, 2023",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
         "10.6",
         "10.5",
@@ -7587,8 +7780,9 @@
       "latest_release_version": "3.9.0",
       "latest_verified_date": "August 31, 2025",
       "latest_release_date": "August 31, 2025",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -7635,7 +7829,7 @@
       "latest_release_version": "1.1.0",
       "latest_verified_date": "December 11, 2018",
       "latest_release_date": "December 11, 2018",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
         "10.6",
         "10.5",
@@ -7685,7 +7879,7 @@
       "latest_release_version": "1.2.0",
       "latest_verified_date": "February 15, 2024",
       "latest_release_date": "February 15, 2024",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
         "10.6",
         "10.5",
@@ -7741,8 +7935,10 @@
       ],
       "latest_verified_date": "July 27, 2026",
       "latest_release_date": "September 2, 2026",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
+        "10.6",
         "10.5",
         "10.4",
         "10.3",
@@ -7782,6 +7978,7 @@
       "latest_verified_version": "8.2.5",
       "latest_release_version": "8.2.5",
       "verified_platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -7794,8 +7991,9 @@
       ],
       "latest_verified_date": "September 24, 2026",
       "latest_release_date": "September 24, 2026",
-      "last_verified_date": "October 6, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -7813,9 +8011,9 @@
       "app_name": "Splunk_TA_infoblox",
       "splunkbase_id": "2934",
       "relationship": "customer-managed-runtime",
-      "cloud_compatible": false,
-      "install_method_single": "rejected",
-      "install_method_distributed": "rejected",
+      "cloud_compatible": true,
+      "install_method_single": "simple",
+      "install_method_distributed": "appmgmt_phase",
       "label": "Splunk Add-on for Infoblox",
       "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
       "package_patterns": [
@@ -7838,11 +8036,12 @@
       },
       "notes": "Shared parser/web/proxy profile; transport ownership rendered per product.",
       "latest_verified_version": "2.2.0",
-      "latest_release_version": "2.2.0",
+      "latest_release_version": "2.2.1",
       "latest_verified_date": "October 6, 2022",
-      "latest_release_date": "October 6, 2022",
-      "last_verified_date": "August 20, 2026",
+      "latest_release_date": "October 29, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -7850,13 +8049,11 @@
         "10.2",
         "10.1",
         "10.0",
-        "9.4",
-        "9.3",
-        "9.2",
-        "9.1",
-        "9.0"
+        "9.4"
       ],
-      "compatibility_status": "supported"
+      "compatibility_status": "supported",
+      "verified_release_evidence_status": "historical-review-only-not-currently-reproducible",
+      "verified_platform_versions": []
     },
     {
       "skill": "splunk-database-ta-setup",
@@ -7887,7 +8084,7 @@
       "latest_verified_date": "August 22, 2024",
       "notes": "SQL Server package includes search-time knowledge, ERRORLOG/SQLAGENT file monitors, Perfmon stanzas, and DB Connect templates.",
       "latest_release_date": "August 22, 2024",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
         "10.6",
         "10.5",
@@ -7932,8 +8129,9 @@
       "latest_verified_date": "April 18, 2025",
       "notes": "MySQL package knowledge and DB Connect templates; JDBC collection delegated to splunk-db-connect-setup.",
       "latest_release_date": "April 18, 2025",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -7973,12 +8171,26 @@
         "uf_safe": true
       },
       "latest_verified_version": "4.2.0",
-      "latest_release_version": "4.2.0",
+      "latest_release_version": "5.0.0",
       "latest_verified_date": "August 27, 2025",
       "notes": "Oracle package knowledge, alert/listener/audit source types, and DB Connect templates; JDBC collection delegated to splunk-db-connect-setup.",
-      "latest_release_date": "August 27, 2025",
-      "last_verified_date": "August 20, 2026",
+      "latest_release_date": "October 22, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "compatibility_status": "supported",
+      "verified_platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -7990,8 +8202,7 @@
         "9.3",
         "9.2",
         "9.1"
-      ],
-      "compatibility_status": "supported"
+      ]
     },
     {
       "skill": "splunk-microsoft-exchange-ta-setup",
@@ -8020,6 +8231,7 @@
       "latest_verified_version": "4.1.1",
       "latest_release_version": "4.1.1",
       "verified_platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -8031,8 +8243,9 @@
       "latest_verified_date": "July 31, 2026",
       "notes": "Multi-app Exchange bundle containing ClientAccess, Mailbox, SMTP Reputation, and Windows Exchange IIS component apps.",
       "latest_release_date": "July 31, 2026",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -8072,8 +8285,9 @@
       "latest_verified_date": "August 8, 2025",
       "notes": "Exchange index definitions for msexchange, perfmon, windows, wineventlog, and msad.",
       "latest_release_date": "August 8, 2025",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -8116,6 +8330,7 @@
       "latest_verified_version": "4.5.1",
       "latest_release_version": "4.5.2",
       "verified_platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -8129,8 +8344,9 @@
       "latest_verified_date": "August 12, 2026",
       "notes": "SCOM PowerShell modular inputs and microsoft:scom source types; run collection on one approved search tier or heavy forwarder.",
       "latest_release_date": "August 31, 2026",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -8170,6 +8386,7 @@
       "latest_verified_version": "3.2.1",
       "latest_release_version": "3.2.1",
       "verified_platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -8179,8 +8396,9 @@
       "latest_verified_date": "July 14, 2026",
       "notes": "ONTAP scheduler/worker collection package using SA-Hydra runtime components.",
       "latest_release_date": "July 14, 2026",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -8218,8 +8436,9 @@
       "latest_verified_date": "August 8, 2025",
       "notes": "ONTAP field extractions, eventtypes, and Hydra troubleshooting source types.",
       "latest_release_date": "August 8, 2025",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -8264,8 +8483,9 @@
       "latest_verified_date": "August 8, 2025",
       "notes": "ONTAP index definition package.",
       "latest_release_date": "August 8, 2025",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -8306,12 +8526,26 @@
         "uf_safe": true
       },
       "latest_verified_version": "3.0.0",
-      "latest_release_version": "3.0.0",
+      "latest_release_version": "3.0.1",
       "latest_verified_date": "August 27, 2025",
       "notes": "Carbon Black JSON file monitor parser package; upstream export or bridge owns file delivery.",
-      "latest_release_date": "August 27, 2025",
-      "last_verified_date": "August 20, 2026",
+      "latest_release_date": "October 19, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "compatibility_status": "supported",
+      "verified_platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -8322,8 +8556,7 @@
         "9.4",
         "9.3",
         "9.2"
-      ],
-      "compatibility_status": "supported"
+      ]
     },
     {
       "skill": "splunk-security-appliance-ta-setup",
@@ -8354,8 +8587,9 @@
       "latest_verified_date": "September 10, 2026",
       "notes": "Symantec EP file and syslog parser package; SC4S/syslog or file monitor owns transport. Package 4.0.1 was downloaded and inspected on 2026-10-06; SHA-256 3c7049cffc6ec0bc040ba06d5e886d8ec0a30ed1851ff6ac919e31eddea585eb. Splunkbase release metadata explicitly lists Enterprise 10.6.",
       "latest_release_date": "September 10, 2026",
-      "last_verified_date": "October 6, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -8368,6 +8602,7 @@
       ],
       "compatibility_status": "supported",
       "verified_platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -8405,8 +8640,9 @@
         "uf_safe": true
       },
       "latest_verified_version": "11.0.2",
-      "latest_release_version": "11.0.3",
+      "latest_release_version": "12.0.0",
       "verified_platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -8418,9 +8654,10 @@
         "9.3"
       ],
       "latest_verified_date": "August 17, 2026",
-      "latest_release_date": "October 1, 2026",
-      "last_verified_date": "August 20, 2026",
+      "latest_release_date": "October 27, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -8461,8 +8698,9 @@
         "uf_safe": false
       },
       "latest_verified_version": "8.2.2",
-      "latest_release_version": "8.2.2",
+      "latest_release_version": "8.3.1",
       "verified_platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -8474,9 +8712,10 @@
         "9.3"
       ],
       "latest_verified_date": "August 19, 2026",
-      "latest_release_date": "August 19, 2026",
-      "last_verified_date": "August 20, 2026",
+      "latest_release_date": "October 21, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -8516,8 +8755,9 @@
         "uf_safe": false
       },
       "latest_verified_version": "11.0.2",
-      "latest_release_version": "11.2.0",
+      "latest_release_version": "11.2.1",
       "verified_platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -8529,9 +8769,10 @@
         "9.3"
       ],
       "latest_verified_date": "July 31, 2026",
-      "latest_release_date": "September 21, 2026",
-      "last_verified_date": "August 20, 2026",
+      "latest_release_date": "October 30, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -8575,7 +8816,7 @@
       "latest_release_version": "4.2.0",
       "latest_verified_date": "November 27, 2023",
       "latest_release_date": "November 27, 2023",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
         "9.4",
         "9.3",
@@ -8612,11 +8853,12 @@
         "uf_safe": false
       },
       "latest_verified_version": "1.0.43",
-      "latest_release_version": "1.0.43",
+      "latest_release_version": "1.0.44",
       "latest_verified_date": "July 21, 2026",
-      "latest_release_date": "July 21, 2026",
-      "last_verified_date": "August 20, 2026",
+      "latest_release_date": "November 16, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -8631,7 +8873,22 @@
         "9.0"
       ],
       "compatibility_status": "supported",
-      "notes": "Splunk On-Call alert action app. Install on a search head or SHC deployer; the package folder remains victorops_app."
+      "notes": "Splunk On-Call alert action app. Install on a search head or SHC deployer; the package folder remains victorops_app.",
+      "verified_platform_versions": [
+        "10.7",
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ]
     },
     {
       "skill": "splunk-microsoft-cloud-setup",
@@ -8661,6 +8918,7 @@
       "latest_verified_version": "6.1.0",
       "latest_release_version": "6.1.1",
       "verified_platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -8673,8 +8931,9 @@
       ],
       "latest_verified_date": "July 30, 2026",
       "latest_release_date": "September 30, 2026",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -8717,8 +8976,9 @@
       "latest_release_version": "2.1.0",
       "latest_verified_date": "June 30, 2026",
       "latest_release_date": "June 30, 2026",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -8764,7 +9024,7 @@
       "latest_release_version": "1.1.0",
       "latest_verified_date": "May 18, 2022",
       "latest_release_date": "May 18, 2022",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
         "9.4",
         "9.3",
@@ -8805,8 +9065,9 @@
       "latest_release_version": "3.0.0",
       "latest_verified_date": "August 7, 2026",
       "latest_release_date": "August 7, 2026",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "8.8",
         "8.7",
         "8.6",
         "8.5",
@@ -8859,6 +9120,7 @@
       "latest_verified_version": "5.1.0",
       "latest_release_version": "5.1.0",
       "verified_platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -8871,8 +9133,9 @@
       ],
       "latest_verified_date": "July 30, 2026",
       "latest_release_date": "July 30, 2026",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -8917,8 +9180,9 @@
       "latest_release_version": "1.1.0",
       "latest_verified_date": "July 30, 2026",
       "latest_release_date": "July 30, 2026",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -8963,7 +9227,7 @@
       "latest_release_version": "1.1.2",
       "latest_verified_date": "November 15, 2023",
       "latest_release_date": "November 15, 2023",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
         "9.4",
         "9.3",
@@ -9002,8 +9266,9 @@
         "uf_safe": true
       },
       "latest_verified_version": "0.158.0",
-      "latest_release_version": "0.161.0",
+      "latest_release_version": "0.164.0",
       "verified_platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -9018,9 +9283,11 @@
         "9.0"
       ],
       "latest_verified_date": "August 7, 2026",
-      "latest_release_date": "September 18, 2026",
-      "last_verified_date": "August 20, 2026",
+      "latest_release_date": "October 30, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
+        "10.6",
         "10.5",
         "10.4",
         "10.3",
@@ -9063,7 +9330,7 @@
         "uf_safe": true
       },
       "latest_verified_version": "0.158.0",
-      "latest_release_version": "0.161.0",
+      "latest_release_version": "0.164.0",
       "verified_platform_versions": [
         "10.6",
         "10.5",
@@ -9079,8 +9346,8 @@
         "9.0"
       ],
       "latest_verified_date": "August 7, 2026",
-      "latest_release_date": "September 18, 2026",
-      "last_verified_date": "August 20, 2026",
+      "latest_release_date": "October 30, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
         "10.5",
         "10.4",
@@ -9124,7 +9391,7 @@
         "uf_safe": true
       },
       "latest_verified_version": "0.158.0",
-      "latest_release_version": "0.161.0",
+      "latest_release_version": "0.164.0",
       "verified_platform_versions": [
         "10.6",
         "10.5",
@@ -9140,8 +9407,8 @@
         "9.0"
       ],
       "latest_verified_date": "August 7, 2026",
-      "latest_release_date": "September 18, 2026",
-      "last_verified_date": "August 20, 2026",
+      "latest_release_date": "October 30, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
         "10.5",
         "10.4",
@@ -9188,7 +9455,7 @@
       "latest_release_version": "1.3",
       "latest_verified_date": "July 27, 2018",
       "latest_release_date": "July 27, 2018",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [],
       "compatibility_status": "unsupported",
       "notes": "Legacy PSC Linux 32-bit runtime tracked for migration/blocking coverage only. Modern Splunk 10.5 deployments must use supported 64-bit PSC packages."
@@ -9222,7 +9489,7 @@
       "latest_release_version": "4.2.1",
       "latest_verified_date": "July 14, 2026",
       "latest_release_date": "July 14, 2026",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
         "10.6",
         "10.5",
@@ -9263,11 +9530,12 @@
         "uf_safe": false
       },
       "latest_verified_version": "2026.5.23",
-      "latest_release_version": "2026.5.23",
+      "latest_release_version": "2026.11.2",
       "latest_verified_date": "May 21, 2026",
-      "latest_release_date": "May 21, 2026",
-      "last_verified_date": "August 20, 2026",
+      "latest_release_date": "November 2, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -9278,7 +9546,17 @@
         "9.4"
       ],
       "compatibility_status": "supported",
-      "notes": "Monitoring Console health-check update add-on used by upgrade and FIPS/TLS readiness runbooks."
+      "notes": "Monitoring Console health-check update add-on used by upgrade and FIPS/TLS readiness runbooks.",
+      "verified_platform_versions": [
+        "10.6",
+        "10.5",
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4"
+      ]
     },
     {
       "skill": "splunk-vmware-ta-setup",
@@ -9309,8 +9587,9 @@
       "latest_release_version": "5.0.1",
       "latest_verified_date": "July 14, 2026",
       "latest_release_date": "July 14, 2026",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
+        "10.7",
         "10.6",
         "10.5",
         "10.4",
@@ -9349,7 +9628,7 @@
       "latest_release_version": "0.1.20",
       "latest_verified_date": "June 14, 2022",
       "latest_release_date": "June 14, 2022",
-      "last_verified_date": "August 20, 2026",
+      "last_verified_date": "November 16, 2026",
       "platform_versions": [
         "9.4",
         "9.3",

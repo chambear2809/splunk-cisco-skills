@@ -93,6 +93,8 @@ to install the add-on through the shared app installer. The script resolves the
 latest Splunkbase release for app ID `6872` and falls back to the local package
 cache when needed.
 
+Splunkbase listed `4.0.0` as its default on November 16, 2026 ([listing](https://splunkbase.splunk.com/app/6872)). The package was downloaded and inspected on 2026-11-16: it contains HSL/IPFIX mapping files and a single `home` view, but no modular inputs or indexes. Verify receiver and companion-dashboard behavior against the installed package; the package itself does not collect flow data.
+
 This add-on is **optional**. It adds Cisco HSL/IPFIX element mappings for extra
 NetFlow-focused dashboards in Cisco Enterprise Networking. It does **not**
 create accounts, inputs, or indexes of its own.

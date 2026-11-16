@@ -111,11 +111,30 @@ add_input() {
     local input_name="$2"
     local account="$3"
     local index="$4"
+    local interval="86400"
     local body
-    body=$(form_urlencode_pairs \
-        disabled "0" \
-        index "${index}" \
-        organization_name "${account}")
+
+    # The Meraki modular-input handlers require an integer interval. Keep the
+    # input defaults aligned with the package's default/inputs.conf.
+    case "${input_type}" in
+        organizationsecurity|securityappliances) interval="360" ;;
+        device_availabilities_change_history|power_modules_statuses_by_device|assurance_alerts) interval="3600" ;;
+    esac
+
+    if [[ "${input_type}" == "airmarshal" || "${input_type}" == "audit" ]]; then
+        body=$(form_urlencode_pairs \
+            disabled "0" \
+            index "${index}" \
+            organization_name "${account}" \
+            interval "${interval}" \
+            start_from_days_ago "7")
+    else
+        body=$(form_urlencode_pairs \
+            disabled "0" \
+            index "${index}" \
+            organization_name "${account}" \
+            interval "${interval}")
+    fi
     rest_create_input "${SK}" "${SPLUNK_URI}" "${APP_NAME}" "cisco_meraki_${input_type}" "${input_name}_${account}" "${body}"
 }
 
