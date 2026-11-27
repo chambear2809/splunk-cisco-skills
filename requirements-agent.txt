@@ -1,7 +1,7 @@
 # MCP SDK 2.x is the supported local skills MCP runtime.
 pip==26.3
 mcp>=2.3.0,<3
-PyYAML==6.0.3
+PyYAML==6.0.4
 # Security-reviewed MCP runtime transitive floor, pinned after pip-audit.
 cryptography==50.0.2
 idna==3.20
